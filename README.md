@@ -8,12 +8,6 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
-## Prerequisites
-
-- [Claude Code CLI](https://claude.ai/code) installed and authenticated
-- `jq` installed (`brew install jq` on macOS)
-- A git repository for your project
-
 ## Setup
 
 ### Option 1: Copy to your project
@@ -46,7 +40,7 @@ This allows you to use the PRD and Ralph skills across all your projects.
 Use the PRD skill to generate a detailed requirements document:
 
 ```
-Load the prd skill and create a PRD for [your feature description]
+/prd create a PRD for @prd.md
 ```
 
 Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
@@ -56,7 +50,7 @@ Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-n
 Use the Ralph skill to convert the markdown PRD to JSON:
 
 ```
-Load the ralph skill and convert tasks/prd-[feature-name].md to prd.json
+/ralph convert tasks/prd-[feature-name].md to prd.json
 ```
 
 This creates `prd.json` with user stories structured for autonomous execution.
@@ -64,7 +58,7 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-./scripts/ralph/ralph.sh [max_iterations]
+./scripts/ralph/ralph.sh [max_iterations] 'path-to-prd.json'
 ```
 
 Default is 10 iterations.
@@ -78,33 +72,6 @@ Ralph will:
 6. Update `prd.json` to mark story as `passes: true`
 7. Append learnings to `progress.txt`
 8. Repeat until all stories pass or max iterations reached
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `ralph.sh` | The bash loop that spawns fresh Claude Code instances |
-| `prompt.md` | Instructions given to each Claude Code instance |
-| `prd.json` | User stories with `passes` status (the task list) |
-| `prd.json.example` | Example PRD format for reference |
-| `progress.txt` | Append-only learnings for future iterations |
-| `skills/prd/` | Skill for generating PRDs |
-| `skills/ralph/` | Skill for converting PRDs to JSON |
-| `flowchart/` | Interactive visualization of how Ralph works |
-
-## Flowchart
-
-[![Ralph Flowchart](ralph-flowchart.png)](https://snarktank.github.io/ralph/)
-
-**[View Interactive Flowchart](https://snarktank.github.io/ralph/)** - Click through to see each step with animations.
-
-The `flowchart/` directory contains the source code. To run locally:
-
-```bash
-cd flowchart
-npm install
-npm run dev
-```
 
 ## Critical Concepts
 
