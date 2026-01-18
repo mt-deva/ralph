@@ -25,9 +25,9 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 
 1. Read progress file (if exists) for previous context
 
-2. Analyze current task state:
-   - If `.beads/` exists: run `bd list --json` to understand existing tasks and dependencies
-   - If prd.json provided: read it for story definitions
+2. Determine task source (**beads takes precedence**):
+   - If `.beads/` exists: **USE BEADS** - run `bd list --json` for tasks, ignore prd.json
+   - Otherwise, if prd.json provided: use it for story definitions
    - Map the current task graph
 
 3. For EACH task/story:
@@ -102,5 +102,6 @@ After analyzing all stories, reply with:
 
 - Read the Codebase Patterns section in the progress file before starting
 - Analyze ALL stories in a single iteration
-- Update the PRD with your findings
+- **If using beads**: update via `bd` commands only, do NOT edit prd.json
+- **If using prd.json**: update the PRD with your findings
 - DO NOT write any implementation code
