@@ -10,77 +10,142 @@ Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
 ## Setup
 
-### Option 1: Copy to your project
-
 Copy the ralph files into your project:
 
 ```bash
-# From your project root
-mkdir -p scripts/ralph
-cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt-plan.md scripts/ralph/
-cp /path/to/ralph/prompt-build.md scripts/ralph/
-chmod +x scripts/ralph/ralph.sh
+mkdir -p .ralph
+cp /path/to/ralph/ralph.sh .ralph/
+cp /path/to/ralph/prompt-plan.md .ralph/
+cp /path/to/ralph/prompt-build.md .ralph/
+chmod +x .ralph/ralph.sh
 ```
 
-### Option 2: Install skills globally
-
-Copy the skills to your Claude Code config for use across all projects:
+## Complete Workflow
 
 ```bash
-cp -r skills/prd ~/.claude/skills/
-cp -r skills/ralph ~/.claude/skills/
+# 1. Convert PRD (using /ralph skill in Claude Code)
+/ralph convert prd.md to .ralph/prd.json
+
+# 2. Plan mode - analyze existing code for gaps
+./.ralph/ralph.sh plan 10 .ralph/prd.json
+
+# 3. Build mode (sequential)
+./.ralph/ralph.sh 150 .ralph/prd.json
+
+# 4. (Optional) Parallel with beads + worktrunk
+bd init
+# Convert prd.json → tasks.jsonl (see conversion section below)
+bd import -i .ralph/tasks.jsonl
+
+# Terminal 1:
+wt switch -c ralph/task-1
+./.ralph/ralph.sh 50  # Picks unblocked task from bd ready
+
+# Terminal 2:
+wt switch -c ralph/task-2
+./.ralph/ralph.sh 50  # Picks different unblocked task
+
+# Check status:
+wt list   # Worktree status
+bd list   # Task dependencies
+
+# Merge when done:
+wt merge
 ```
 
-This allows you to use the PRD and Ralph skills across all your projects.
+## prd.json vs Beads
 
-## Workflow
+Two separate approaches, not a conversion:
 
-### 1. Create a PRD
+| Aspect | prd.json | Beads |
+|--------|----------|-------|
+| Use case | Sequential, solo execution | Parallel, multiple agents |
+| Task selection | Highest priority with `passes: false` | `bd ready` (respects dependencies) |
+| Parallelism | None - one story at a time | Multiple worktrees, multiple Ralphs |
+| Dependencies | Implicit via priority ordering | Explicit via `--dep` flags |
+| Setup | Single JSON file | `bd init`, create tasks manually |
 
-Use the PRD skill to generate a detailed requirements document:
+**Recommendation:**
+- Start with prd.json (simpler)
+- Graduate to beads when you need parallelism
+- One massive prd.json is fine - Ralph only reads it, picks one story per iteration
 
-```
-/prd create a PRD for @prd.md
-```
+**Beads mode detection:** Ralph auto-detects when `.beads/` directory exists:
+- With `.beads/`: uses `bd ready` for task selection
+- Without: falls back to `prd.json`
+- Disable: `RALPH_NO_BEADS=1 ./ralph.sh`
 
-Answer the clarifying questions. The skill saves output to `tasks/prd-[feature-name].md`.
+## Converting prd.json to Beads
 
-### 2. Convert PRD to Ralph format
+### Option 1: JSONL Import (Recommended)
 
-Use the Ralph skill to convert the markdown PRD to JSON:
-
-```
-/ralph convert tasks/prd-[feature-name].md to prd.json
-```
-
-This creates `prd.json` with user stories structured for autonomous execution.
-
-### 3. Run Ralph
+Beads has native import: `bd import -i issues.jsonl`
 
 ```bash
-# Build mode (default) - implement stories
-./scripts/ralph/ralph.sh [max_iterations] [prd_path]
+# 1. Initialize beads
+bd init
 
-# Plan mode - gap analysis only, no code
-./scripts/ralph/ralph.sh plan [max_iterations] [prd_path]
+# 2. Convert prd.json to JSONL format
+# Each line is a JSON object:
+{"id":"bd-us001","title":"US-001: Story Title","description":"As a user...","status":"open","priority":1,"type":"feature","dependencies":[]}
+{"id":"bd-us002","title":"US-002: Second Story","description":"...","status":"open","priority":2,"type":"feature","dependencies":["bd-us001"]}
+
+# 3. Import
+bd import -i tasks.jsonl --dry-run  # Preview first
+bd import -i tasks.jsonl            # Actual import
 ```
 
-Default is 10 iterations. Default PRD path is `prd.json` in the ralph directory.
+**Import flags:**
+- `--dry-run` - preview without creating
+- `--skip-existing` - don't overwrite
+- `--force` - refresh all from JSONL
 
-**Plan mode** (optional): Analyzes codebase against PRD, marks existing functionality as done, updates stories with implementation notes. Use when starting a PRD on an existing codebase.
+### Option 2: Rapid-fire bd create
 
-**Build mode**: Implements stories one at a time.
+```bash
+bd init
+bd create "US-001: Story Title" -p 1
+bd create "US-002: Second Story" -p 2 --dep bd-xxx
+bd sync  # Flush to disk
+```
 
-Ralph will:
-1. Create a feature branch (from PRD `branchName`)
-2. Pick the highest priority story where `passes: false`
-3. Implement that single story
-4. Run quality checks (typecheck, tests)
-5. Commit if checks pass
-6. Update `prd.json` to mark story as `passes: true`
-7. Append learnings to `progress.txt`
-8. Repeat until all stories pass or max iterations reached
+### Scripted Conversion
+
+Ask Claude:
+```
+Read my prd.json and generate a beads JSONL file.
+Map userStories to beads issues with:
+- id: "bd-" + story.id (lowercase)
+- title: story.id + ": " + story.title
+- description: story.description + "\n\nAcceptance Criteria:\n" + criteria
+- priority: story.priority
+- dependencies: based on priority ordering
+```
+
+## Worktree Tools
+
+| Tool | Use When |
+|------|----------|
+| `bd worktree` | Using beads - auto-configures DB sharing |
+| git-worktree skill | No beads, want .env auto-copy |
+| worktrunk (wt) | Need CI hooks, pre-merge gates (recommended) |
+
+**If using beads** - prefer `bd worktree`:
+```bash
+bd worktree create .worktrees/feature-a --branch feature/a
+bd worktree list
+bd worktree remove .worktrees/feature-a
+```
+
+**Worktrunk** adds CI layer on top:
+```bash
+# Install
+brew install worktrunk/worktrunk/worktrunk
+
+# Setup hooks
+mkdir -p .config
+cp /path/to/ralph/wt-hooks.toml .config/wt.toml
+```
 
 ## Critical Concepts
 
@@ -133,8 +198,6 @@ Frontend stories must include "Verify in browser using dev-browser skill" in acc
 
 ## Debugging
 
-Check current state:
-
 ```bash
 # See which stories are done
 jq '.userStories[] | {id, title, passes}' prd.json
@@ -147,6 +210,10 @@ cat progress.txt
 
 # Check git history
 git log --oneline -10
+
+# Beads status
+bd list
+bd ready
 ```
 
 ## Customizing Prompts
@@ -170,68 +237,8 @@ The prompt includes a guardrail to prevent Ralph's Achilles' heel: re-implementi
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
 
-## Parallel Execution with Worktrunk + Beads
-
-For running multiple Ralph agents in parallel on independent tasks.
-
-### Prerequisites
-
-- [Worktrunk](https://github.com/worktrunk/worktrunk) for git worktree management
-- [Beads](https://github.com/beads/beads) for task dependency graphs
-
-### Setup
-
-1. Initialize beads:
-   ```bash
-   bd init
-   ```
-
-2. Create tasks with dependencies:
-   ```bash
-   bd create "Epic: User Auth" --label epic
-   bd create "Login form" --parent bd-xxx
-   bd create "OAuth flow" --parent bd-xxx --dep bd-xxx.1
-   ```
-
-3. Copy worktrunk hooks (optional):
-   ```bash
-   cp ralph/wt-hooks.toml .config/wt.toml
-   ```
-
-### Running Parallel Ralphs
-
-```bash
-# Terminal 1
-wt switch -c ralph/login-form
-./ralph.sh 10  # Picks from bd ready
-
-# Terminal 2
-wt switch -c ralph/oauth
-./ralph.sh 10  # Blocked until login-form completes
-
-# Check status
-wt list   # Worktree status
-bd list   # Task dependencies
-
-# Merge when done
-wt merge
-```
-
-### Beads Mode Detection
-
-Ralph auto-detects beads when `.beads/` directory exists:
-- With `.beads/`: uses `bd ready` for task selection
-- Without: falls back to `prd.json`
-
-Disable beads detection: `RALPH_NO_BEADS=1 ./ralph.sh`
-
-### Key Patterns
+## Key Patterns
 
 - **bd sync at session end**: Always run `bd sync` before ending to flush changes (bypasses 30-sec debounce)
 - **Per-worktree progress.txt**: Avoids merge conflicts across parallel agents
 - **Single orchestrator**: For advanced parallel setups, have one orchestrator assign tasks to workers
-
-## References
-
-- [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)
-- [Claude Code documentation](https://docs.anthropic.com/en/docs/claude-code)
