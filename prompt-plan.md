@@ -23,20 +23,48 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 
 ## Planning Task
 
-1. Read the PRD at the provided path
-2. Read the progress file at the provided path (if exists) for previous context
-3. For EACH user story in the PRD:
-   - Use subagents to thoroughly search the codebase
-   - Check if the functionality already exists (fully or partially)
-   - Identify existing patterns, utilities, or components to leverage
-   - Note any blockers or dependencies
+1. Read progress file (if exists) for previous context
 
-4. Update the PRD with discoveries:
-   - Set `passes: true` for stories where functionality already exists
-   - Add notes to story descriptions about existing code to leverage
-   - Reorder stories if dependencies require it
+2. Analyze current task state:
+   - If `.beads/` exists: run `bd list --json` to understand existing tasks and dependencies
+   - If prd.json provided: read it for story definitions
+   - Map the current task graph
+
+3. For EACH task/story:
+   - Use subagents to thoroughly search the codebase
+   - Check if functionality already exists (fully or partially)
+   - Identify existing patterns, utilities, or components to leverage
+   - Note blockers or dependencies
+
+4. Update task state based on findings:
+
+   **If using beads:**
+   - **EXISTS**: Mark complete with `bd done <task-id>`
+   - **PARTIAL**: Add note, create sub-task if needed with `bd create "Complete X" --dep <partial-task-id>`
+   - **NEW**: Create task with `bd create "Title" -p <priority>`, set `--dep` on any blocking tasks
+   - Consider where new tasks fit in dependency chain
+   - Run `bd sync` after changes
+
+   **If using prd.json:**
+   - Set `passes: true` for existing functionality
+   - Add notes about existing code to leverage
+   - Reorder if dependencies require it
 
 5. Append findings to the progress file
+
+## Task Placement Guidelines
+
+When creating new beads tasks:
+1. Run `bd list --json` first to see existing task IDs and dependencies
+2. Identify if new task is blocked by existing work → use `--dep <blocker-id>`
+3. Identify if new task blocks existing work → note in description, may need to update existing task deps
+4. Set priority relative to related tasks (lower number = higher priority)
+
+Example:
+- Existing: `bd-001` (setup DB) → `bd-002` (add users table)
+- Gap found: need user validation before users table
+- Create: `bd create "Add user validation" -p 1 --dep bd-001`
+- Update: may need to add `--dep` on bd-002 to depend on new task
 
 ## Gap Analysis Format
 
