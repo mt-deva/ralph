@@ -170,6 +170,67 @@ The prompt includes a guardrail to prevent Ralph's Achilles' heel: re-implementi
 
 Ralph automatically archives previous runs when you start a new feature (different `branchName`). Archives are saved to `archive/YYYY-MM-DD-feature-name/`.
 
+## Parallel Execution with Worktrunk + Beads
+
+For running multiple Ralph agents in parallel on independent tasks.
+
+### Prerequisites
+
+- [Worktrunk](https://github.com/worktrunk/worktrunk) for git worktree management
+- [Beads](https://github.com/beads/beads) for task dependency graphs
+
+### Setup
+
+1. Initialize beads:
+   ```bash
+   bd init
+   ```
+
+2. Create tasks with dependencies:
+   ```bash
+   bd create "Epic: User Auth" --label epic
+   bd create "Login form" --parent bd-xxx
+   bd create "OAuth flow" --parent bd-xxx --dep bd-xxx.1
+   ```
+
+3. Copy worktrunk hooks (optional):
+   ```bash
+   cp ralph/wt-hooks.toml .config/wt.toml
+   ```
+
+### Running Parallel Ralphs
+
+```bash
+# Terminal 1
+wt switch -c ralph/login-form
+./ralph.sh 10  # Picks from bd ready
+
+# Terminal 2
+wt switch -c ralph/oauth
+./ralph.sh 10  # Blocked until login-form completes
+
+# Check status
+wt list   # Worktree status
+bd list   # Task dependencies
+
+# Merge when done
+wt merge
+```
+
+### Beads Mode Detection
+
+Ralph auto-detects beads when `.beads/` directory exists:
+- With `.beads/`: uses `bd ready` for task selection
+- Without: falls back to `prd.json`
+
+Disable beads detection: `RALPH_NO_BEADS=1 ./ralph.sh`
+
+### Key Patterns
+
+- **bd sync at session end**: Always run `bd sync` before ending to flush changes (bypasses 30-sec debounce)
+- **Per-worktree progress.txt**: Avoids merge conflicts across parallel agents
+- **Single orchestrator**: For advanced parallel setups, have one orchestrator assign tasks to workers
+
 ## References
 
 - [Geoffrey Huntley's Ralph article](https://ghuntley.com/ralph/)

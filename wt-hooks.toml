@@ -1,0 +1,13 @@
+# Worktrunk hooks template for Ralph parallel execution
+# Copy to your project's .config/wt.toml
+
+# Share cached dependencies (fast worktree setup)
+[post-create]
+copy-cache = "wt step copy-ignored"
+deps = "npm install"
+
+# Quality gates before merge
+[pre-merge]
+typecheck = "npm run typecheck"
+lint = "npm run lint"
+test = "npm test"

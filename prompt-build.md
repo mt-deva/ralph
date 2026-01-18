@@ -111,9 +111,27 @@ If there are still stories with `passes: false`, end your response normally (ano
 
 ---
 
+## Beads Mode
+
+If `RALPH_CURRENT_TASK` env var is set, you're in beads mode:
+
+1. Task came from `bd ready` (no blockers)
+2. Get task details: `bd show $RALPH_CURRENT_TASK`
+3. After completing implementation + tests:
+   ```bash
+   bd close $RALPH_CURRENT_TASK
+   bd sync  # IMPORTANT: flush to git immediately
+   ```
+4. If blocked by another task: `bd dep add $RALPH_CURRENT_TASK <blocking-task>`
+5. Task-specific notes: `bd comment $RALPH_CURRENT_TASK "Note here"`
+
+Cross-task learnings still go in progress.txt.
+
+---
+
 ## Important
 
-- Work on ONE story per iteration
+- Work on ONE story/task per iteration
 - Read the Codebase Patterns section in the progress file before starting
 - Commit frequently
 - Keep CI green

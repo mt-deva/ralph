@@ -12,6 +12,12 @@ if [[ "$1" == "plan" ]]; then
   shift  # Remove 'plan' from args so remaining args work normally
 fi
 
+# Detect beads mode
+USE_BEADS=false
+if [ -d ".beads" ] && [ "$RALPH_NO_BEADS" != "1" ]; then
+  USE_BEADS=true
+fi
+
 # Color support - auto-detect + NO_COLOR support
 if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
   RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m'
@@ -36,7 +42,8 @@ if [[ ! "$PRD_FILE" = /* ]]; then
   PRD_FILE="$(pwd)/$PRD_FILE"
 fi
 
-if [ ! -f "$PRD_FILE" ]; then
+# PRD file required unless using beads
+if [ ! -f "$PRD_FILE" ] && [ "$USE_BEADS" != "true" ]; then
   log_error "PRD file not found: $PRD_FILE"
   exit 1
 fi
@@ -101,8 +108,12 @@ printf "\n"
 printf "${BOLD}============================================${NC}\n"
 printf "${BOLD}Ralph${NC} - Autonomous AI Agent Loop\n"
 printf "Mode: ${CYAN}%s${NC}\n" "$MODE_LABEL"
+if [[ "$USE_BEADS" == "true" ]]; then
+  printf "Tasks: ${CYAN}Beads (.beads/)${NC}\n"
+else
+  printf "PRD: ${CYAN}%s${NC}\n" "$PRD_FILE"
+fi
 printf "Engine: ${CYAN}OpenCode${NC}\n"
-printf "PRD: ${CYAN}%s${NC}\n" "$PRD_FILE"
 printf "Max: ${YELLOW}%s iterations${NC}, Timeout: ${YELLOW}%ss${NC}\n" "$MAX_ITERATIONS" "$ITERATION_TIMEOUT"
 printf "${BOLD}============================================${NC}\n"
 
@@ -110,18 +121,34 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   printf "\n${BOLD}>>> Iteration %d of %d (%s)${NC}\n" "$i" "$MAX_ITERATIONS" "$MODE_LABEL"
   printf "${DIM}────────────────────────────────────────${NC}\n"
 
-  # In build mode, find and set next story. In plan mode, skip this.
+  # In build mode, find and set next story/task. In plan mode, skip this.
   if [[ "$MODE" == "build" ]]; then
-    NEXT_STORY=$(jq -r '.userStories[] | select(.passes == false) | .id' "$PRD_FILE" | head -1)
-    if [ -z "$NEXT_STORY" ]; then
-      log_success "All stories complete!"
-      printf "\n${BOLD}============================================${NC}\n"
-      printf "${GREEN}✓ Ralph completed all tasks!${NC}\n"
-      printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
-      printf "${BOLD}============================================${NC}\n"
-      exit 0
+    if [[ "$USE_BEADS" == "true" ]]; then
+      # Beads mode: get next ready task
+      NEXT_TASK=$(bd ready --json 2>/dev/null | jq -r '.[0].id // empty')
+      if [ -z "$NEXT_TASK" ]; then
+        log_success "All tasks complete (bd ready returned empty)"
+        printf "\n${BOLD}============================================${NC}\n"
+        printf "${GREEN}✓ Ralph completed all tasks!${NC}\n"
+        printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
+        printf "${BOLD}============================================${NC}\n"
+        exit 0
+      fi
+      export RALPH_CURRENT_TASK="$NEXT_TASK"
+      log_info "Current task: $NEXT_TASK (beads)"
+    else
+      # PRD mode: get next incomplete story
+      NEXT_STORY=$(jq -r '.userStories[] | select(.passes == false) | .id' "$PRD_FILE" | head -1)
+      if [ -z "$NEXT_STORY" ]; then
+        log_success "All stories complete!"
+        printf "\n${BOLD}============================================${NC}\n"
+        printf "${GREEN}✓ Ralph completed all tasks!${NC}\n"
+        printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
+        printf "${BOLD}============================================${NC}\n"
+        exit 0
+      fi
+      log_info "Current story: $NEXT_STORY"
     fi
-    log_info "Current story: $NEXT_STORY"
   else
     log_info "Planning mode - analyzing all stories"
   fi
