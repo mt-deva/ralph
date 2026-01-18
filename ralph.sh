@@ -1,8 +1,30 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [max_iterations] [prd_path] [timeout_seconds]
+#        ./ralph.sh plan [max_iterations] [prd_path] [timeout_seconds]
 
 set -e
+
+# Detect plan mode
+MODE="build"
+if [[ "$1" == "plan" ]]; then
+  MODE="plan"
+  shift  # Remove 'plan' from args so remaining args work normally
+fi
+
+# Color support - auto-detect + NO_COLOR support
+if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
+  RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m'
+  BLUE='\033[0;34m' CYAN='\033[0;36m' BOLD='\033[1m' DIM='\033[2m' NC='\033[0m'
+else
+  RED='' GREEN='' YELLOW='' BLUE='' CYAN='' BOLD='' DIM='' NC=''
+fi
+
+# Log functions
+log_info()    { printf "${BLUE}[INFO]${NC} %s\n" "$*"; }
+log_success() { printf "${GREEN}[OK]${NC} %s\n" "$*"; }
+log_warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$*" >&2; }
+log_error()   { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; }
 
 MAX_ITERATIONS=${1:-10}
 ITERATION_TIMEOUT=${3:-1800}  # 30 minutes default
@@ -15,7 +37,7 @@ if [[ ! "$PRD_FILE" = /* ]]; then
 fi
 
 if [ ! -f "$PRD_FILE" ]; then
-  echo "Error: PRD file not found: $PRD_FILE"
+  log_error "PRD file not found: $PRD_FILE"
   exit 1
 fi
 PRD_DIR="$(dirname "$PRD_FILE")"
@@ -35,11 +57,11 @@ if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
     FOLDER_NAME=$(echo "$LAST_BRANCH" | sed 's|^ralph/||')
     ARCHIVE_FOLDER="$ARCHIVE_DIR/$DATE-$FOLDER_NAME"
 
-    echo "Archiving previous run: $LAST_BRANCH"
+    log_info "Archiving previous run: $LAST_BRANCH"
     mkdir -p "$ARCHIVE_FOLDER"
     [ -f "$PRD_FILE" ] && cp "$PRD_FILE" "$ARCHIVE_FOLDER/"
     [ -f "$PROGRESS_FILE" ] && cp "$PROGRESS_FILE" "$ARCHIVE_FOLDER/"
-    echo "   Archived to: $ARCHIVE_FOLDER"
+    log_success "Archived to: $ARCHIVE_FOLDER"
 
     # Reset progress file for new run
     echo "# Ralph Progress Log" > "$PROGRESS_FILE"
@@ -63,49 +85,72 @@ if [ ! -f "$PROGRESS_FILE" ]; then
   echo "---" >> "$PROGRESS_FILE"
 fi
 
-echo "Starting Ralph - Max iterations: $MAX_ITERATIONS, Timeout: ${ITERATION_TIMEOUT}s"
-echo "PRD: $PRD_FILE"
-echo "Progress: $PROGRESS_FILE"
+# Set mode-specific prompt file and completion signal
+if [[ "$MODE" == "plan" ]]; then
+  PROMPT_FILE="$SCRIPT_DIR/prompt-plan.md"
+  COMPLETION_SIGNAL="<promise>PLAN_COMPLETE</promise>"
+  MODE_LABEL="PLAN"
+else
+  PROMPT_FILE="$SCRIPT_DIR/prompt-build.md"
+  COMPLETION_SIGNAL="<promise>COMPLETE</promise>"
+  MODE_LABEL="BUILD"
+fi
+
+# Banner
+printf "\n"
+printf "${BOLD}============================================${NC}\n"
+printf "${BOLD}Ralph${NC} - Autonomous AI Agent Loop\n"
+printf "Mode: ${CYAN}%s${NC}\n" "$MODE_LABEL"
+printf "Engine: ${CYAN}OpenCode${NC}\n"
+printf "PRD: ${CYAN}%s${NC}\n" "$PRD_FILE"
+printf "Max: ${YELLOW}%s iterations${NC}, Timeout: ${YELLOW}%ss${NC}\n" "$MAX_ITERATIONS" "$ITERATION_TIMEOUT"
+printf "${BOLD}============================================${NC}\n"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
-  echo ""
-  echo "═══════════════════════════════════════════════════════"
-  echo "  Ralph Iteration $i of $MAX_ITERATIONS"
-  echo "═══════════════════════════════════════════════════════"
+  printf "\n${BOLD}>>> Iteration %d of %d (%s)${NC}\n" "$i" "$MAX_ITERATIONS" "$MODE_LABEL"
+  printf "${DIM}────────────────────────────────────────${NC}\n"
 
-  # Find next incomplete story and set as currentStory in PRD
-  NEXT_STORY=$(jq -r '.userStories[] | select(.passes == false) | .id' "$PRD_FILE" | head -1)
-  if [ -z "$NEXT_STORY" ]; then
-    echo "All stories complete!"
-    exit 0
+  # In build mode, find and set next story. In plan mode, skip this.
+  if [[ "$MODE" == "build" ]]; then
+    NEXT_STORY=$(jq -r '.userStories[] | select(.passes == false) | .id' "$PRD_FILE" | head -1)
+    if [ -z "$NEXT_STORY" ]; then
+      log_success "All stories complete!"
+      printf "\n${BOLD}============================================${NC}\n"
+      printf "${GREEN}✓ Ralph completed all tasks!${NC}\n"
+      printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
+      printf "${BOLD}============================================${NC}\n"
+      exit 0
+    fi
+    log_info "Current story: $NEXT_STORY"
+  else
+    log_info "Planning mode - analyzing all stories"
   fi
-  echo "Current story: $NEXT_STORY"
-  jq --arg id "$NEXT_STORY" '.currentStory = $id' "$PRD_FILE" > "$PRD_FILE.tmp" && mv "$PRD_FILE.tmp" "$PRD_FILE"
 
-  # Run opencode with the ralph prompt (use @ to reference file inline)
-  OUTPUT=$(timeout "$ITERATION_TIMEOUT" opencode run --model=google/antigravity-claude-opus-4-5-thinking --variant=max "Execute the instructions in @$SCRIPT_DIR/prompt.md - PRD location: $PRD_FILE - Progress location: $PROGRESS_FILE" 2>&1 | tee /dev/stderr)
+  # Run opencode with prompt
+  OUTPUT=$(timeout "$ITERATION_TIMEOUT" opencode run --model=google/antigravity-claude-opus-4-5-thinking --variant=max "Execute the instructions in @$PROMPT_FILE - PRD location: $PRD_FILE - Progress location: $PROGRESS_FILE" 2>&1 | tee /dev/stderr)
   EXIT_CODE=$?
 
   # Check for timeout
   if [ $EXIT_CODE -eq 124 ]; then
-    echo ""
-    echo "WARNING: Iteration $i timed out after ${ITERATION_TIMEOUT}s"
+    printf "\n"
+    log_warn "Iteration $i timed out after ${ITERATION_TIMEOUT}s"
     echo "## TIMEOUT at $(date) - Iteration $i" >> "$PROGRESS_FILE"
   fi
 
   # Check for completion signal
-  if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then
-    echo ""
-    echo "Ralph completed all tasks!"
-    echo "Completed at iteration $i of $MAX_ITERATIONS"
+  if echo "$OUTPUT" | grep -q "$COMPLETION_SIGNAL"; then
+    printf "\n${BOLD}============================================${NC}\n"
+    printf "${GREEN}✓ Ralph %s complete!${NC}\n" "$MODE_LABEL"
+    printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
+    printf "${BOLD}============================================${NC}\n"
     exit 0
   fi
 
-  echo "Iteration $i complete. Continuing..."
+  log_success "Iteration $i complete"
   sleep 2
 done
 
-echo ""
-echo "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
-echo "Check $PROGRESS_FILE for status."
+printf "\n"
+log_warn "Ralph reached max iterations ($MAX_ITERATIONS) without completing all tasks."
+log_info "Check $PROGRESS_FILE for status."
 exit 1

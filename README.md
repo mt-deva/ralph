@@ -18,7 +18,8 @@ Copy the ralph files into your project:
 # From your project root
 mkdir -p scripts/ralph
 cp /path/to/ralph/ralph.sh scripts/ralph/
-cp /path/to/ralph/prompt.md scripts/ralph/
+cp /path/to/ralph/prompt-plan.md scripts/ralph/
+cp /path/to/ralph/prompt-build.md scripts/ralph/
 chmod +x scripts/ralph/ralph.sh
 ```
 
@@ -58,10 +59,18 @@ This creates `prd.json` with user stories structured for autonomous execution.
 ### 3. Run Ralph
 
 ```bash
-./scripts/ralph/ralph.sh [max_iterations] 'path-to-prd.json'
+# Build mode (default) - implement stories
+./scripts/ralph/ralph.sh [max_iterations] [prd_path]
+
+# Plan mode - gap analysis only, no code
+./scripts/ralph/ralph.sh plan [max_iterations] [prd_path]
 ```
 
-Default is 10 iterations.
+Default is 10 iterations. Default PRD path is `prd.json` in the ralph directory.
+
+**Plan mode** (optional): Analyzes codebase against PRD, marks existing functionality as done, updates stories with implementation notes. Use when starting a PRD on an existing codebase.
+
+**Build mode**: Implements stories one at a time.
 
 Ralph will:
 1. Create a feature branch (from PRD `branchName`)
@@ -119,7 +128,8 @@ Frontend stories must include "Verify in browser using dev-browser skill" in acc
 
 ### Stop Condition
 
-When all stories have `passes: true`, Ralph outputs `<promise>COMPLETE</promise>` and the loop exits.
+- **Build mode**: When all stories have `passes: true`, outputs `<promise>COMPLETE</promise>`
+- **Plan mode**: After analyzing all stories, outputs `<promise>PLAN_COMPLETE</promise>`
 
 ## Debugging
 
@@ -127,7 +137,10 @@ Check current state:
 
 ```bash
 # See which stories are done
-cat prd.json | jq '.userStories[] | {id, title, passes}'
+jq '.userStories[] | {id, title, passes}' prd.json
+
+# See incomplete stories only
+jq '.userStories[] | select(.passes == false) | {id, title}' prd.json
 
 # See learnings from previous iterations
 cat progress.txt
@@ -136,12 +149,22 @@ cat progress.txt
 git log --oneline -10
 ```
 
-## Customizing prompt.md
+## Customizing Prompts
 
-Edit `prompt.md` to customize Ralph's behavior for your project:
+Two mode-specific prompt files:
+- `prompt-plan.md` - Gap analysis instructions (no code writing)
+- `prompt-build.md` - Implementation instructions
+
+Both contain: Critical guardrail, subagent usage, ultrathink guidance.
+
+Edit to customize for your project:
 - Add project-specific quality check commands
 - Include codebase conventions
 - Add common gotchas for your stack
+
+### Critical Guardrail
+
+The prompt includes a guardrail to prevent Ralph's Achilles' heel: re-implementing existing code. Ralph is instructed to search the codebase before writing any new code.
 
 ## Archiving
 
