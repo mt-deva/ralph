@@ -17,6 +17,7 @@ mkdir -p .ralph
 cp /path/to/ralph/ralph.sh .ralph/
 cp /path/to/ralph/prompt-plan.md .ralph/
 cp /path/to/ralph/prompt-build.md .ralph/
+cp /path/to/ralph/wt-hooks.toml .ralph/
 chmod +x .ralph/ralph.sh
 ```
 
@@ -122,30 +123,39 @@ Map userStories to beads issues with:
 - dependencies: based on priority ordering
 ```
 
-## Worktree Tools
+## Parallel Execution with Worktrunk
 
-| Tool | Use When |
-|------|----------|
-| `bd worktree` | Using beads - auto-configures DB sharing |
-| git-worktree skill | No beads, want .env auto-copy |
-| worktrunk (wt) | Need CI hooks, pre-merge gates (recommended) |
+For running multiple Ralph agents in parallel:
 
-**If using beads** - prefer `bd worktree`:
 ```bash
-bd worktree create .worktrees/feature-a --branch feature/a
-bd worktree list
-bd worktree remove .worktrees/feature-a
-```
-
-**Worktrunk** adds CI layer on top:
-```bash
-# Install
+# Install worktrunk
 brew install worktrunk/worktrunk/worktrunk
 
-# Setup hooks
+# Setup hooks (pre-merge typecheck, lint, test)
 mkdir -p .config
-cp /path/to/ralph/wt-hooks.toml .config/wt.toml
+cp .ralph/wt-hooks.toml .config/wt.toml
+
+# Terminal 1:
+wt switch -c ralph/task-1
+./.ralph/ralph.sh 50  # Picks unblocked task from bd ready
+
+# Terminal 2:
+wt switch -c ralph/task-2
+./.ralph/ralph.sh 50  # Picks different unblocked task
+
+# Check status
+wt list   # Worktree status
+bd list   # Task dependencies
+
+# Merge when done
+wt merge
 ```
+
+Key commands:
+- `wt switch -c <branch>` - create worktree and switch
+- `wt list` - show all worktrees
+- `wt merge` - merge current worktree to main
+- `wt remove` - clean up worktree
 
 ## Critical Concepts
 
