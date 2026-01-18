@@ -5,19 +5,6 @@
 
 set -e
 
-# Detect plan mode
-MODE="build"
-if [[ "$1" == "plan" ]]; then
-  MODE="plan"
-  shift  # Remove 'plan' from args so remaining args work normally
-fi
-
-# Detect beads mode
-USE_BEADS=false
-if [ -d ".beads" ] && [ "$RALPH_NO_BEADS" != "1" ]; then
-  USE_BEADS=true
-fi
-
 # Color support - auto-detect + NO_COLOR support
 if [[ -t 1 ]] && [[ -z "${NO_COLOR:-}" ]] && [[ "${TERM:-}" != "dumb" ]]; then
   RED='\033[0;31m' GREEN='\033[0;32m' YELLOW='\033[0;33m'
@@ -32,6 +19,23 @@ log_success() { printf "${GREEN}[OK]${NC} %s\n" "$*"; }
 log_warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$*" >&2; }
 log_error()   { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; }
 
+# Detect plan mode
+MODE="build"
+if [[ "$1" == "plan" ]]; then
+  MODE="plan"
+  shift  # Remove 'plan' from args so remaining args work normally
+fi
+
+# Detect beads mode
+USE_BEADS=false
+if [ -d ".beads" ] && [ "$RALPH_NO_BEADS" != "1" ]; then
+  if command -v bd >/dev/null 2>&1; then
+    USE_BEADS=true
+  else
+    log_warn "Beads directory found but 'bd' command not installed, falling back to PRD"
+  fi
+fi
+
 MAX_ITERATIONS=${1:-10}
 ITERATION_TIMEOUT=${3:-1800}  # 30 minutes default
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,11 +47,14 @@ if [[ ! "$PRD_FILE" = /* ]]; then
 fi
 
 # PRD file required unless using beads
-if [ ! -f "$PRD_FILE" ] && [ "$USE_BEADS" != "true" ]; then
+if [ -f "$PRD_FILE" ]; then
+  PRD_DIR="$(dirname "$PRD_FILE")"
+elif [[ "$USE_BEADS" == "true" ]]; then
+  PRD_DIR="$(pwd)"  # beads-only mode, no PRD needed
+else
   log_error "PRD file not found: $PRD_FILE"
   exit 1
 fi
-PRD_DIR="$(dirname "$PRD_FILE")"
 PROGRESS_FILE="$PRD_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
@@ -153,8 +160,14 @@ for i in $(seq 1 $MAX_ITERATIONS); do
     log_info "Planning mode - analyzing all stories"
   fi
 
+  # Build task context for prompt
+  TASK_CONTEXT=""
+  if [[ -n "$RALPH_CURRENT_TASK" ]]; then
+    TASK_CONTEXT=" - Current task: $RALPH_CURRENT_TASK"
+  fi
+
   # Run opencode with prompt
-  OUTPUT=$(timeout "$ITERATION_TIMEOUT" opencode run --model=google/antigravity-claude-opus-4-5-thinking --variant=max "Execute the instructions in @$PROMPT_FILE - PRD location: $PRD_FILE - Progress location: $PROGRESS_FILE" 2>&1 | tee /dev/stderr)
+  OUTPUT=$(timeout "$ITERATION_TIMEOUT" opencode run --model=google/antigravity-claude-opus-4-5-thinking --variant=max "Execute the instructions in @$PROMPT_FILE - PRD location: $PRD_FILE - Progress location: $PROGRESS_FILE$TASK_CONTEXT" 2>&1 | tee /dev/stderr)
   EXIT_CODE=$?
 
   # Check for timeout

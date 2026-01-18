@@ -1,10 +1,11 @@
 # Worktrunk hooks template for Ralph parallel execution
 # Copy to your project's .config/wt.toml
+# Customize deps commands for your package manager (pnpm, yarn, bun, etc.)
 
 # Share cached dependencies (fast worktree setup)
 [post-create]
 copy-cache = "wt step copy-ignored"
-deps = "npm install"
+deps = "npm install"  # or: pnpm install, yarn, bun install
 
 # Quality gates before merge
 [pre-merge]
