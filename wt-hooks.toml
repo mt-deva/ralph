@@ -5,10 +5,10 @@
 # Share cached dependencies (fast worktree setup)
 [post-create]
 copy-cache = "wt step copy-ignored"
-deps = "npm install"  # or: pnpm install, yarn, bun install
+deps = "pnpm install"  # or: pnpm install, yarn, bun install
 
 # Quality gates before merge
 [pre-merge]
-typecheck = "npm run typecheck"
-lint = "npm run lint"
-test = "npm test"
+typecheck = "pnpm run typecheck"
+lint = "pnpm run lint"
+test = "pnpm test"
