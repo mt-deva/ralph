@@ -55,12 +55,50 @@ Ralph uses Claude Code Tasks for coordination:
 | Task storage | `~/.claude/tasks/<task-list-id>/` |
 | Cross-session sync | All sessions with same `CLAUDE_CODE_TASK_LIST_ID` see updates |
 | Task creation | Via TaskCreate tool in planning mode |
+| Task updates | Via TaskUpdate tool in build mode |
+| Task viewing | Via TaskList and TaskGet tools |
 | Task selection | Highest priority pending task |
 
 **Task list ID** is auto-generated from `<directory>-<branch>` or set manually:
 ```bash
 CLAUDE_CODE_TASK_LIST_ID=my-feature ./ralph.sh 50
 ```
+
+### Task API
+
+Ralph uses these Claude Code tools to manage tasks:
+
+**TaskCreate** - Create new tasks (plan mode):
+```json
+{
+  "subject": "Add status column to tasks table",
+  "description": "Add status enum column with values: pending, in_progress, done. Default to pending.",
+  "activeForm": "Adding status column to tasks table"
+}
+```
+
+**TaskUpdate** - Update task status (build mode):
+```json
+{
+  "taskId": "task-123",
+  "status": "in_progress"  // or "completed"
+}
+```
+
+**TaskList** - View all tasks:
+Returns list with id, subject, status, owner, blockedBy
+
+**TaskGet** - Get task details:
+Returns full task info including description
+
+### Task Lifecycle
+
+1. **Plan mode**: TaskCreate creates tasks with status `pending`
+2. **Build mode**:
+   - TaskList shows available tasks
+   - TaskUpdate sets status to `in_progress` when starting
+   - TaskUpdate sets status to `completed` when done
+3. **All modes**: Tasks persist to filesystem, sync across all sessions with same task list ID
 
 ## Parallel Execution with Worktrunk
 
