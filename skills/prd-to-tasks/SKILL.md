@@ -18,30 +18,44 @@ Converts existing PRDs to Claude Code Tasks that Ralph uses for autonomous execu
 
 Proceed with creating tasks in the current namespace.
 
-**At the END**, output a clear summary:
-
-```
-✓ Created N tasks in namespace: {current_namespace}
-
-Ralph expects namespace: {ralph_namespace}
-{if they match: "✓ Namespaces match - ralph will find these tasks"}
-{if they don't: "⚠ Mismatch - Run ralph with: CLAUDE_CODE_TASK_LIST_ID={current_namespace} ./.ralph/ralph.sh plan 10"}
-```
-
 ---
 
 ## The Job
 
 Take a PRD (markdown file or text) and convert it to tasks via TaskCreate. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
 
-**CRITICAL - After creating tasks:**
-1. Output the namespace summary (as shown above)
-2. Tell the user to run: `./.ralph/ralph.sh plan 10`
-3. **STOP - Do NOT implement anything**
-4. **Do NOT start coding**
-5. **Do NOT ask if they want you to implement**
+**Workflow:**
+1. Audit codebase for existing functionality
+2. Create tasks via TaskCreate
+3. Set dependencies via TaskUpdate
+4. Output summary
+5. **STOP** - Do NOT implement anything
 
-Your job ends when tasks are created. Ralph handles implementation.
+---
+
+## Codebase Audit
+
+Before creating tasks, thoroughly audit the codebase:
+
+1. **Use subagents** - Spawn explore agents to search in parallel for faster results
+2. **For each PRD feature**, determine:
+   - **EXISTS**: Functionality already implemented → create task then immediately mark `completed`
+   - **PARTIAL**: Some pieces exist → note in description what's missing
+   - **NEW**: Must be built from scratch
+
+### Example Gap Analysis
+```
+Feature: User authentication
+- Login form → EXISTS (found in app/login/page.tsx)
+- Password reset → PARTIAL (email sending exists in lib/email.ts, reset flow missing)
+- 2FA → NEW (nothing exists)
+```
+
+### Search Patterns
+- Use Grep for function/class names mentioned in PRD
+- Use Glob to find related files by name
+- Check for existing database tables/migrations
+- Look for similar UI components
 
 ---
 
@@ -64,16 +78,6 @@ Each task requires these fields for TaskCreate:
 | `activeForm` | Present participle (-ing) form shown in spinner | "Adding login API endpoint" |
 
 All tasks are created with status `pending`. Use TaskUpdate to change status to `in_progress` or `completed`.
-
-## Task Persistence
-
-Tasks persist to `~/.claude/tasks/<task-list-id>/` and sync across sessions:
-
-- **Set task list:** `CLAUDE_CODE_TASK_LIST_ID=my-feature claude`
-- **Multiple sessions:** All sessions with same ID see updates in real-time
-- **Subagents:** Task updates broadcast to all agents working on same list
-
-Ralph sets this automatically from directory + branch name.
 
 ---
 
@@ -107,36 +111,6 @@ Tasks execute in list order. Earlier tasks must not depend on later ones.
 2. Server actions / backend logic
 3. UI components that use the backend
 4. Dashboard/summary views that aggregate data
-
-**Wrong order:**
-1. UI component (depends on schema that does not exist yet)
-2. Schema change
-
----
-
-## Search Codebase First
-
-Before creating tasks, search for existing functionality:
-
-1. Use Grep/Glob to find related code
-2. Mark already-implemented features as `completed`
-3. Note location in task description for partial implementations
-
-**If functionality exists:** Create the task, then immediately mark it as `completed` using TaskUpdate:
-```json
-// First create with TaskCreate:
-{
-  "subject": "Add users table migration",
-  "description": "Add users table migration (already exists in db/migrations/001_users.sql)",
-  "activeForm": "Adding users table migration"
-}
-
-// Then mark completed with TaskUpdate:
-{
-  "taskId": "<task-id>",
-  "status": "completed"
-}
-```
 
 ---
 
@@ -177,6 +151,58 @@ Each is one focused change that can be completed and verified independently.
 
 ---
 
+## Dependency Planning
+
+After creating ALL tasks, establish dependencies:
+
+1. **Get task IDs** - Call TaskList to see created tasks with their IDs
+2. **Analyze relationships** based on:
+   - Schema/migration tasks block backend tasks
+   - Backend tasks block UI tasks that consume them
+   - Foundation utilities block features using them
+   - Shared entities (same table/model mentioned) indicate dependency
+3. **Set dependencies** via TaskUpdate:
+   ```json
+   {
+     "taskId": "3",
+     "addBlockedBy": ["1", "2"]
+   }
+   ```
+
+### Dependency Detection Rules
+
+| Pattern | Example | Dependency |
+|---------|---------|------------|
+| Schema → Backend | "Add users table" → "Add user API" | API blocked by schema |
+| Backend → UI | "Create auth endpoint" → "Build login form" | Form blocked by endpoint |
+| Shared entity | Both mention "notifications" | Later task blocked by earlier |
+| Explicit in PRD | "Filter requires status field" | Filter blocked by status |
+
+### Keep Chains Shallow
+
+- Avoid deep chains (A→B→C→D→E serializes everything)
+- Independent tasks should have NO blockers (enables parallel execution)
+- Only block on direct dependencies
+
+### Example
+
+Tasks created:
+1. Add status column to tasks table
+2. Display status badge on task cards
+3. Add status dropdown to task rows
+4. Add status filter dropdown
+
+Dependencies to set:
+```
+TaskUpdate: {"taskId": "2", "addBlockedBy": ["1"]}  // badge needs column
+TaskUpdate: {"taskId": "3", "addBlockedBy": ["1"]}  // dropdown needs column
+TaskUpdate: {"taskId": "4", "addBlockedBy": ["1"]}  // filter needs column
+```
+
+Tasks 2, 3, 4 can run in parallel after Task 1 completes.
+
+---
+
 ## Example
 
 **Input PRD:**
@@ -193,9 +219,10 @@ Add ability to mark tasks with different statuses.
 ```
 
 **Process:**
-1. Search codebase for existing status handling → None found
+1. Audit codebase for existing status handling → None found
 2. Break into 4 ordered tasks (schema → UI → interaction → filtering)
-3. Create tasks via TaskCreate (call TaskCreate 4 times, once per task)
+3. Create tasks via TaskCreate (call TaskCreate 4 times)
+4. Set dependencies via TaskUpdate
 
 **Output TaskCreate calls:**
 ```json
@@ -228,17 +255,30 @@ Add ability to mark tasks with different statuses.
 }
 ```
 
+**Output TaskUpdate calls (dependencies):**
+```json
+{"taskId": "2", "addBlockedBy": ["1"]}
+{"taskId": "3", "addBlockedBy": ["1"]}
+{"taskId": "4", "addBlockedBy": ["1"]}
+```
+
 **Output summary:**
 ```
-Created 4 tasks from PRD:
-- 4 pending (new work)
-- 0 completed (already exists)
+✓ Created 4 tasks in namespace: {current_namespace}
 
-Task order:
+Ralph expects namespace: {ralph_namespace}
+✓ Namespaces match - ralph will find these tasks
+
+Tasks:
 1. Add status field to tasks table - pending
-2. Display status badge on task cards - pending
-3. Add status dropdown to task rows - pending
-4. Add status filter dropdown - pending
+2. Display status badge on task cards - pending (blocked by #1)
+3. Add status dropdown to task rows - pending (blocked by #1)
+4. Add status filter dropdown - pending (blocked by #1)
+
+Dependencies:
+- #2, #3, #4 ← #1 (all UI needs schema first)
+
+Run: ./.ralph/ralph.sh 10
 ```
 
 ---
@@ -247,7 +287,7 @@ Task order:
 
 Before calling TaskCreate, verify:
 
-- [ ] Searched codebase for existing functionality
+- [ ] Audited codebase for existing functionality (EXISTS/PARTIAL/NEW)
 - [ ] Each task is completable in one iteration (small enough)
 - [ ] Tasks are ordered by dependency (schema → backend → UI)
 - [ ] Task descriptions are verifiable (not vague)
@@ -256,13 +296,13 @@ Before calling TaskCreate, verify:
 - [ ] `description` provides detailed context and acceptance criteria
 - [ ] `activeForm` uses present participle ("Adding...", "Creating...", "Building...")
 
-Tasks will persist to `~/.claude/tasks/` and sync across all Ralph iterations automatically.
+After calling TaskCreate, set dependencies via TaskUpdate.
 
 ---
 
-## After Creating Tasks
+## After Creating Tasks and Dependencies
 
-**YOU ARE DONE.** Output the summary with namespace info, tell user to run ralph, and STOP.
+**YOU ARE DONE.** Output the summary with namespace info and dependency graph, tell user to run `./ralph.sh`, and STOP.
 
 Do NOT:
 - Ask if they want you to implement
@@ -270,4 +310,4 @@ Do NOT:
 - Suggest next steps beyond running ralph
 - Make any code changes
 
-The skill ends here. Ralph takes over from here.
+The skill ends here. Ralph handles implementation.

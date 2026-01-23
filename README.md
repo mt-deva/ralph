@@ -25,7 +25,6 @@ Copy the ralph files into your project:
 ```bash
 mkdir -p .ralph
 cp /path/to/ralph/ralph.sh .ralph/
-cp /path/to/ralph/prompt-plan.md .ralph/
 cp /path/to/ralph/prompt-build.md .ralph/
 cp /path/to/ralph/wt-hooks.toml .ralph/
 chmod +x .ralph/ralph.sh
@@ -34,13 +33,11 @@ chmod +x .ralph/ralph.sh
 ## Complete Workflow
 
 ```bash
-# 0. Create tasks from specs (using skill)
+# 1. Create tasks from specs (using skill)
 # In Claude Code: /prd-to-tasks
+# This audits codebase, creates tasks, and sets dependencies
 
-# 1. Plan mode - audit tasks against codebase
-./.ralph/ralph.sh plan 10
-
-# 2. Build mode - execute remaining tasks
+# 2. Run Ralph to execute tasks
 ./.ralph/ralph.sh 150
 
 # 3. (Optional) Parallel with worktrunk
@@ -59,7 +56,7 @@ wt list   # Worktree status
 wt merge
 ```
 
-**Specification context:** Ralph reads `docs/*.md` files for project specifications, architecture decisions, and requirements. This context helps Claude understand what to build. Use the `/prd-to-tasks` skill to convert specs in `docs/*.md` to Tasks. Plan mode then audits those tasks against the codebase and establishes dependencies (e.g., schema → backend → UI).
+**Specification context:** Ralph reads `docs/*.md` files for project specifications, architecture decisions, and requirements. This context helps Claude understand what to build. Use the `/prd-to-tasks` skill to convert specs in `docs/*.md` to Tasks. The skill audits the codebase, creates tasks, and establishes dependencies (e.g., schema → backend → UI).
 
 ## Task Management
 
@@ -74,8 +71,7 @@ Ralph uses Claude Code Tasks - a coordination primitive designed for complex pro
 |---------|--------------|
 | Task storage | `~/.claude/tasks/<task-list-id>/` |
 | Cross-session sync | All sessions with same `CLAUDE_CODE_TASK_LIST_ID` see updates |
-| Task creation | Via `/prd-to-tasks` skill (before plan mode) |
-| Task auditing | Via TaskUpdate in plan mode (mark completed, set dependencies) |
+| Task creation | Via `/prd-to-tasks` skill (creates + sets dependencies) |
 | Task execution | Via TaskUpdate in build mode (mark in_progress, completed) |
 | Task viewing | Via TaskList and TaskGet tools |
 | Dependencies | Tasks can block each other via `blocks`/`blockedBy` metadata |
@@ -97,17 +93,16 @@ Ralph uses these Claude Code tools to manage tasks:
   "activeForm": "Adding status column to tasks table"
 }
 ```
-Note: Tasks are created BEFORE plan mode via the `/prd-to-tasks` skill, not during plan mode.
 
 **TaskUpdate** - Update task status and dependencies:
 ```json
-// Mark task in progress (build mode)
+// Mark task in progress
 {
   "taskId": "1",
   "status": "in_progress"
 }
 
-// Set dependencies (plan mode) - task IDs from TaskList
+// Set dependencies - task IDs from TaskList
 {
   "taskId": "2",
   "addBlockedBy": ["1"]
@@ -122,17 +117,17 @@ Returns full task info including description
 
 ### Task Lifecycle
 
-1. **Before plan mode**: Use `/prd-to-tasks` skill to create tasks from `docs/*.md` specs
-2. **Plan mode**:
-   - Audits existing tasks against codebase
-   - Marks completed tasks via TaskUpdate
-   - Establishes dependencies via TaskUpdate (addBlockedBy/addBlocks)
-3. **Build mode**:
+1. **`/prd-to-tasks` skill**:
+   - Audits codebase for existing functionality
+   - Creates tasks via TaskCreate
+   - Sets dependencies via TaskUpdate
+   - Marks existing functionality as completed
+2. **Ralph build mode**:
    - TaskList shows available tasks (pending, not blocked)
    - TaskUpdate sets status to `in_progress` when starting
    - TaskUpdate sets status to `completed` when done
    - Completing a task unblocks dependent tasks
-4. **All modes**: Tasks persist to filesystem, sync across all sessions with same task list ID
+3. **All modes**: Tasks persist to filesystem, sync across all sessions with same task list ID
 
 ## Parallel Execution with Worktrunk
 
@@ -214,9 +209,8 @@ Frontend tasks must include browser verification. Ralph will use the dev-browser
 
 ### Stop Condition
 
-- **Build mode**: When all tasks are completed, outputs `<promise>COMPLETE</promise>`
-- **Plan mode**: After creating tasks, outputs `<promise>PLAN_COMPLETE</promise>`
-- **Empty task list**: Ralph exits when no pending tasks remain
+- When all tasks are completed, outputs `<promise>COMPLETE</promise>`
+- Ralph exits when no pending tasks remain
 
 ## Debugging
 
@@ -231,11 +225,7 @@ ls ~/.claude/tasks/
 
 ## Customizing Prompts
 
-Two mode-specific prompt files:
-- `prompt-plan.md` - Task creation instructions (no code writing)
-- `prompt-build.md` - Implementation instructions
-
-Both contain: Critical guardrail, subagent usage, ultrathink guidance.
+`prompt-build.md` contains the implementation instructions Claude follows each iteration.
 
 Edit to customize for your project:
 - Add project-specific quality check commands
@@ -248,5 +238,4 @@ The prompt includes a guardrail to prevent Ralph's Achilles' heel: re-implementi
 
 ## Skills
 
-- `/prd` - Generate a PRD from a feature description (saves to docs/)
-- `/prd-to-tasks` - Convert a PRD document into Claude Code Tasks (creates Tasks from docs/*.md)
+- `/prd-to-tasks` - Convert a PRD document into Claude Code Tasks (audits codebase, creates tasks, sets dependencies)

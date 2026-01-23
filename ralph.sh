@@ -1,7 +1,6 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
 # Usage: ./ralph.sh [max_iterations] [timeout_seconds]
-#        ./ralph.sh plan [max_iterations] [timeout_seconds]
 
 set -e
 
@@ -19,13 +18,6 @@ log_success() { printf "${GREEN}[OK]${NC} %s\n" "$*"; }
 log_warn()    { printf "${YELLOW}[WARN]${NC} %s\n" "$*" >&2; }
 log_error()   { printf "${RED}[ERROR]${NC} %s\n" "$*" >&2; }
 
-# Detect plan mode
-MODE="build"
-if [[ "$1" == "plan" ]]; then
-  MODE="plan"
-  shift  # Remove 'plan' from args so remaining args work normally
-fi
-
 MAX_ITERATIONS=${1:-10}
 ITERATION_TIMEOUT=${2:-1800}  # 30 minutes default
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,37 +25,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Generate task list ID from directory + branch
 TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)}"
 
-# Set mode-specific prompt file and completion signal
-if [[ "$MODE" == "plan" ]]; then
-  PROMPT_FILE="$SCRIPT_DIR/prompt-plan.md"
-  COMPLETION_SIGNAL="<promise>PLAN_COMPLETE</promise>"
-  MODE_LABEL="PLAN"
-else
-  PROMPT_FILE="$SCRIPT_DIR/prompt-build.md"
-  COMPLETION_SIGNAL="<promise>COMPLETE</promise>"
-  MODE_LABEL="BUILD"
-fi
+PROMPT_FILE="$SCRIPT_DIR/prompt-build.md"
+COMPLETION_SIGNAL="<promise>COMPLETE</promise>"
 
 # Banner
 printf "\n"
 printf "${BOLD}============================================${NC}\n"
 printf "${BOLD}Ralph${NC} - Autonomous AI Agent Loop\n"
-printf "Mode: ${CYAN}%s${NC}\n" "$MODE_LABEL"
 printf "Tasks: ${CYAN}%s${NC}\n" "$TASK_LIST_ID"
 printf "Engine: ${CYAN}Claude Code${NC}\n"
 printf "Max: ${YELLOW}%s iterations${NC}, Timeout: ${YELLOW}%ss${NC}\n" "$MAX_ITERATIONS" "$ITERATION_TIMEOUT"
 printf "${BOLD}============================================${NC}\n"
 
 for i in $(seq 1 $MAX_ITERATIONS); do
-  printf "\n${BOLD}>>> Iteration %d of %d (%s)${NC}\n" "$i" "$MAX_ITERATIONS" "$MODE_LABEL"
+  printf "\n${BOLD}>>> Iteration %d of %d${NC}\n" "$i" "$MAX_ITERATIONS"
   printf "${DIM}────────────────────────────────────────${NC}\n"
 
-  # Claude manages its own tasks via CLAUDE_CODE_TASK_LIST_ID
-  if [[ "$MODE" == "build" ]]; then
-    log_info "Claude managing tasks via $TASK_LIST_ID"
-  else
-    log_info "Planning mode - auditing tasks"
-  fi
+  log_info "Claude managing tasks via $TASK_LIST_ID"
 
   # Get recent commit history for context
   GIT_HISTORY=$(git log --oneline --no-decorate -10 2>/dev/null || echo "No git history")
@@ -87,13 +65,13 @@ $GIT_HISTORY"
   # Check for completion signal OR empty task list
   if echo "$OUTPUT" | grep -q "$COMPLETION_SIGNAL"; then
     printf "\n${BOLD}============================================${NC}\n"
-    printf "${GREEN}✓ Ralph %s complete!${NC}\n" "$MODE_LABEL"
+    printf "${GREEN}✓ Ralph complete!${NC}\n"
     printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
     printf "${BOLD}============================================${NC}\n"
     exit 0
   elif echo "$OUTPUT" | grep -qiE "(no pending tasks|task list (is )?empty|all tasks completed)"; then
     printf "\n${BOLD}============================================${NC}\n"
-    printf "${GREEN}✓ Ralph %s complete (empty task list)!${NC}\n" "$MODE_LABEL"
+    printf "${GREEN}✓ Ralph complete (empty task list)!${NC}\n"
     printf "Finished at iteration ${CYAN}%d${NC} of %d\n" "$i" "$MAX_ITERATIONS"
     printf "${BOLD}============================================${NC}\n"
     exit 0
