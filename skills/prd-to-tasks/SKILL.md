@@ -34,6 +34,15 @@ Ralph expects namespace: {ralph_namespace}
 
 Take a PRD (markdown file or text) and convert it to tasks via TaskCreate. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
 
+**CRITICAL - After creating tasks:**
+1. Output the namespace summary (as shown above)
+2. Tell the user to run: `./.ralph/ralph.sh plan 10`
+3. **STOP - Do NOT implement anything**
+4. **Do NOT start coding**
+5. **Do NOT ask if they want you to implement**
+
+Your job ends when tasks are created. Ralph handles implementation.
+
 ---
 
 ## Output Format
@@ -248,3 +257,17 @@ Before calling TaskCreate, verify:
 - [ ] `activeForm` uses present participle ("Adding...", "Creating...", "Building...")
 
 Tasks will persist to `~/.claude/tasks/` and sync across all Ralph iterations automatically.
+
+---
+
+## After Creating Tasks
+
+**YOU ARE DONE.** Output the summary with namespace info, tell user to run ralph, and STOP.
+
+Do NOT:
+- Ask if they want you to implement
+- Start coding
+- Suggest next steps beyond running ralph
+- Make any code changes
+
+The skill ends here. Ralph takes over from here.
