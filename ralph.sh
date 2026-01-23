@@ -38,7 +38,6 @@ fi
 
 # Generate task list ID from directory + branch
 TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)}"
-export CLAUDE_CODE_TASK_LIST_ID="$TASK_LIST_ID"
 
 # Set mode-specific prompt file and completion signal
 if [[ "$MODE" == "plan" ]]; then
@@ -86,7 +85,7 @@ $GIT_HISTORY"
 PRD: $PRD_FILE"
 
   # Run claude with prompt
-  OUTPUT=$(timeout "$ITERATION_TIMEOUT" claude --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
+  OUTPUT=$(timeout "$ITERATION_TIMEOUT" claude -p "CLAUDE_CODE_TASK_LIST_ID=${TASK_LIST_ID}" --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
   EXIT_CODE=$?
 
   # Check for timeout

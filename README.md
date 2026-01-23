@@ -6,6 +6,16 @@ Ralph is an autonomous AI agent loop that runs [Claude Code](https://claude.ai/c
 
 Based on [Geoffrey Huntley's Ralph pattern](https://ghuntley.com/ralph/).
 
+## Why Ralph Works Now
+
+As model capabilities grow with Opus 4.5, Claude can run autonomously for longer and track its state better. Ralph leverages Claude Code's new **Tasks** primitive - an evolution from the simpler TodoWrite tool that enables:
+
+- **Cross-session coordination**: Tasks persist to `~/.claude/tasks/` and sync across all sessions with the same task list ID
+- **Dependency management**: Tasks can block each other, mirroring how real projects work
+- **Multi-agent collaboration**: Multiple Ralph instances or subagents can work on the same task list in parallel
+
+This is why Ralph's architecture works: each iteration is a fresh session, but Tasks provide the coordination layer that persists across context windows.
+
 [Read my in-depth article on how I use Ralph](https://x.com/ryancarson/status/2008548371712135632)
 
 ## Setup
@@ -48,7 +58,12 @@ wt merge
 
 ## Task Management
 
-Ralph uses Claude Code Tasks for coordination:
+Ralph uses Claude Code Tasks - a coordination primitive designed for complex projects. Unlike the previous TodoWrite tool, Tasks are:
+
+- **Persistent**: Stored in `~/.claude/tasks/<task-list-id>/` on the filesystem
+- **Shared**: All sessions with the same `CLAUDE_CODE_TASK_LIST_ID` see real-time updates
+- **Structured**: Support dependencies, blockers, status tracking, and ownership
+- **Collaborative**: Enable multiple agents or sessions to work on the same project
 
 | Feature | How It Works |
 |---------|--------------|
@@ -57,7 +72,7 @@ Ralph uses Claude Code Tasks for coordination:
 | Task creation | Via TaskCreate tool in planning mode |
 | Task updates | Via TaskUpdate tool in build mode |
 | Task viewing | Via TaskList and TaskGet tools |
-| Task selection | Highest priority pending task |
+| Dependencies | Tasks can block each other via `blocks`/`blockedBy` metadata |
 
 **Task list ID** is auto-generated from `<directory>-<branch>` or set manually:
 ```bash
@@ -139,9 +154,9 @@ Key commands:
 
 ### Each Iteration = Fresh Context
 
-Each iteration spawns a **new Claude Code instance** with clean context. The only memory between iterations is:
-- Git history (commits with learnings from previous iterations)
-- Claude Code Tasks (synced via `~/.claude/tasks/`)
+Each iteration spawns a **new Claude Code instance** with clean context. This prevents context pollution and allows Opus 4.5 to work autonomously without degradation. Memory persists between iterations via:
+- **Git history**: Commits with learnings from previous iterations
+- **Claude Code Tasks**: Real-time sync via `~/.claude/tasks/` - when one session updates a task, all other sessions see the change immediately
 
 ### Small Tasks
 
