@@ -75,7 +75,7 @@ Recent commits (for context):
 $GIT_HISTORY"
 
   # Run claude with prompt
-  OUTPUT=$(timeout "$ITERATION_TIMEOUT" claude -p "CLAUDE_CODE_TASK_LIST_ID=${TASK_LIST_ID}" --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
+  OUTPUT=$(timeout "$ITERATION_TIMEOUT" CLAUDE_CODE_TASK_LIST_ID=${TASK_LIST_ID} claude -p --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
   EXIT_CODE=$?
 
   # Check for timeout

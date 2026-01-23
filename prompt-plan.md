@@ -1,3 +1,5 @@
+Call TaskList NOW as your first action. Then read the rest of these instructions.
+
 # Ralph Agent Instructions - PLAN MODE
 
 You are an autonomous coding agent in **PLANNING** mode.
