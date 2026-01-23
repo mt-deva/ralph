@@ -1,240 +1,250 @@
 ---
-name: prd-to-tasks
-description: "Generate a Product Requirements Document (PRD) for a new feature. Use when planning a feature, starting a new project, or when asked to create a PRD. Triggers on: create a prd, write prd for, plan this feature, requirements for, spec out."
+name: converting-prd-to-tasks
+description: "Convert PRDs to Claude Code Tasks via TaskCreate. Use when you have an existing PRD and need to create tasks for Ralph. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks."
 ---
 
-# PRD Generator
+# PRD to Tasks Converter
 
-Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.
+Converts existing PRDs to Claude Code Tasks that Ralph uses for autonomous execution.
+
+---
+
+## Task Namespace Detection
+
+**At the START**, detect both namespaces:
+
+1. **Current namespace** (where tasks will be created): Use Bash `echo "${CLAUDE_CODE_TASK_LIST_ID:-default}"`
+2. **Ralph's expected namespace**: Use Bash `echo "$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)"`
+
+Proceed with creating tasks in the current namespace.
+
+**At the END**, output a clear summary:
+
+```
+✓ Created N tasks in namespace: {current_namespace}
+
+Ralph expects namespace: {ralph_namespace}
+{if they match: "✓ Namespaces match - ralph will find these tasks"}
+{if they don't: "⚠ Mismatch - Run ralph with: CLAUDE_CODE_TASK_LIST_ID={current_namespace} ./.ralph/ralph.sh plan 10"}
+```
 
 ---
 
 ## The Job
 
-1. Receive a feature description from the user
-2. Ask 3-5 essential clarifying questions (with lettered options)
-3. Generate a structured PRD based on answers
-4. Save to `tasks/prd-[feature-name].md`
-
-**Important:** Do NOT start implementing. Just create the PRD.
+Take a PRD (markdown file or text) and convert it to tasks via TaskCreate. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
 
 ---
 
-## Step 1: Clarifying Questions
+## Output Format
 
-Ask only critical questions where the initial prompt is ambiguous. Focus on:
+Each task requires these fields for TaskCreate:
 
-- **Problem/Goal:** What problem does this solve?
-- **Core Functionality:** What are the key actions?
-- **Scope/Boundaries:** What should it NOT do?
-- **Success Criteria:** How do we know it's done?
-
-### Format Questions Like This:
-
-```
-1. What is the primary goal of this feature?
-   A. Improve user onboarding experience
-   B. Increase user retention
-   C. Reduce support burden
-   D. Other: [please specify]
-
-2. Who is the target user?
-   A. New users only
-   B. Existing users only
-   C. All users
-   D. Admin users only
-
-3. What is the scope?
-   A. Minimal viable version
-   B. Full-featured implementation
-   C. Just the backend/API
-   D. Just the UI
+```json
+{
+  "subject": "Add status column to tasks table",
+  "description": "Add status column to tasks table with enum values: pending, in_progress, completed. Set default to pending.",
+  "activeForm": "Adding status column to tasks table"
+}
 ```
 
-This lets users respond with "1A, 2C, 3B" for quick iteration.
+| Field | Description | Example |
+|-------|-------------|---------|
+| `subject` | Brief imperative task title | "Add login API endpoint" |
+| `description` | Detailed description of what needs to be done | "Create POST /api/login endpoint that accepts email/password and returns JWT token" |
+| `activeForm` | Present participle (-ing) form shown in spinner | "Adding login API endpoint" |
+
+All tasks are created with status `pending`. Use TaskUpdate to change status to `in_progress` or `completed`.
+
+## Task Persistence
+
+Tasks persist to `~/.claude/tasks/<task-list-id>/` and sync across sessions:
+
+- **Set task list:** `CLAUDE_CODE_TASK_LIST_ID=my-feature claude`
+- **Multiple sessions:** All sessions with same ID see updates in real-time
+- **Subagents:** Task updates broadcast to all agents working on same list
+
+Ralph sets this automatically from directory + branch name.
 
 ---
 
-## Step 2: PRD Structure
+## Task Size: The Number One Rule
 
-Generate the PRD with these sections:
+**Each task must be completable in ONE Ralph iteration (one context window).**
 
-### 1. Introduction/Overview
-Brief description of the feature and the problem it solves.
+Ralph spawns a fresh Claude Code instance per iteration with no memory of previous work. If a task is too big, the LLM runs out of context before finishing and produces broken code.
 
-### 2. Goals
-Specific, measurable objectives (bullet list).
+### Right-sized tasks:
+- Add a database column and migration
+- Add a UI component to an existing page
+- Update a server action with new logic
+- Add a filter dropdown to a list
 
-### 3. User Stories
-Each story needs:
-- **Title:** Short descriptive name
-- **Description:** "As a [user], I want [feature] so that [benefit]"
-- **Acceptance Criteria:** Verifiable checklist of what "done" means
+### Too big (split these):
+- "Build the entire dashboard" → Split into: schema, queries, UI components, filters
+- "Add authentication" → Split into: schema, middleware, login UI, session handling
+- "Refactor the API" → Split into one task per endpoint or pattern
 
-Each story should be small enough to implement in one focused session.
+**Rule of thumb:** If you cannot describe the change in 2-3 sentences, it is too big.
 
-**Format:**
+---
+
+## Task Ordering: Dependencies First
+
+Tasks execute in list order. Earlier tasks must not depend on later ones.
+
+**Correct order:**
+1. Schema/database changes (migrations)
+2. Server actions / backend logic
+3. UI components that use the backend
+4. Dashboard/summary views that aggregate data
+
+**Wrong order:**
+1. UI component (depends on schema that does not exist yet)
+2. Schema change
+
+---
+
+## Search Codebase First
+
+Before creating tasks, search for existing functionality:
+
+1. Use Grep/Glob to find related code
+2. Mark already-implemented features as `completed`
+3. Note location in task description for partial implementations
+
+**If functionality exists:** Create the task, then immediately mark it as `completed` using TaskUpdate:
+```json
+// First create with TaskCreate:
+{
+  "subject": "Add users table migration",
+  "description": "Add users table migration (already exists in db/migrations/001_users.sql)",
+  "activeForm": "Adding users table migration"
+}
+
+// Then mark completed with TaskUpdate:
+{
+  "taskId": "<task-id>",
+  "status": "completed"
+}
+```
+
+---
+
+## Task Descriptions: Must Be Verifiable
+
+Each task description should be something Ralph can CHECK, not something vague.
+
+### Good descriptions (verifiable):
+- "Add `status` column to tasks table with default 'pending'"
+- "Create filter dropdown with options: All, Active, Completed"
+- "Add delete button that shows confirmation dialog"
+- "Build login form with email/password fields"
+
+### Bad descriptions (vague):
+- "Implement the feature correctly"
+- "Make it work"
+- "Add good UX"
+- "Handle edge cases"
+
+---
+
+## Splitting Large PRDs
+
+If a PRD has big features, split them:
+
+**Original:**
+> "Add user notification system"
+
+**Split into:**
+1. Add notifications table to database
+2. Create notification service for sending notifications
+3. Add notification bell icon to header
+4. Create notification dropdown panel
+5. Add mark-as-read functionality
+6. Add notification preferences page
+
+Each is one focused change that can be completed and verified independently.
+
+---
+
+## Example
+
+**Input PRD:**
 ```markdown
-### US-001: [Title]
-**Description:** As a [user], I want [feature] so that [benefit].
+# Task Status Feature
 
-**Acceptance Criteria:**
-- [ ] Specific verifiable criterion
-- [ ] Another criterion
-- [ ] Typecheck/lint passes
-- [ ] **[UI stories only]** Verify in browser using dev-browser skill
+Add ability to mark tasks with different statuses.
+
+## Requirements
+- Toggle between pending/in-progress/done on task list
+- Filter list by status
+- Show status badge on each task
+- Persist status in database
 ```
 
-**Important:** 
-- Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
-- **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+**Process:**
+1. Search codebase for existing status handling → None found
+2. Break into 4 ordered tasks (schema → UI → interaction → filtering)
+3. Create tasks via TaskCreate (call TaskCreate 4 times, once per task)
 
-### 4. Functional Requirements
-Numbered list of specific functionalities:
-- "FR-1: The system must allow users to..."
-- "FR-2: When a user clicks X, the system must..."
+**Output TaskCreate calls:**
+```json
+// Task 1
+{
+  "subject": "Add status field to tasks table",
+  "description": "Add status field to tasks table with enum: pending, in_progress, done (default pending). Include database migration.",
+  "activeForm": "Adding status field to tasks table"
+}
 
-Be explicit and unambiguous.
+// Task 2
+{
+  "subject": "Display status badge on task cards",
+  "description": "Display status badge on task cards with colors: gray=pending, blue=in_progress, green=done",
+  "activeForm": "Displaying status badge on task cards"
+}
 
-### 5. Non-Goals (Out of Scope)
-What this feature will NOT include. Critical for managing scope.
+// Task 3
+{
+  "subject": "Add status dropdown to task rows",
+  "description": "Add status dropdown to each task row that saves immediately without page refresh",
+  "activeForm": "Adding status dropdown to task rows"
+}
 
-### 6. Design Considerations (Optional)
-- UI/UX requirements
-- Link to mockups if available
-- Relevant existing components to reuse
+// Task 4
+{
+  "subject": "Add status filter dropdown",
+  "description": "Add status filter dropdown (All, Pending, In Progress, Done) that persists in URL params",
+  "activeForm": "Adding status filter dropdown"
+}
+```
 
-### 7. Technical Considerations (Optional)
-- Known constraints or dependencies
-- Integration points with existing systems
-- Performance requirements
+**Output summary:**
+```
+Created 4 tasks from PRD:
+- 4 pending (new work)
+- 0 completed (already exists)
 
-### 8. Success Metrics
-How will success be measured?
-- "Reduce time to complete X by 50%"
-- "Increase conversion rate by 10%"
-
-### 9. Open Questions
-Remaining questions or areas needing clarification.
-
----
-
-## Writing for Junior Developers
-
-The PRD reader may be a junior developer or AI agent. Therefore:
-
-- Be explicit and unambiguous
-- Avoid jargon or explain it
-- Provide enough detail to understand purpose and core logic
-- Number requirements for easy reference
-- Use concrete examples where helpful
-
----
-
-## Output
-
-- **Format:** Markdown (`.md`)
-- **Location:** `tasks/`
-- **Filename:** `prd-[feature-name].md` (kebab-case)
-
----
-
-## Example PRD
-
-```markdown
-# PRD: Task Priority System
-
-## Introduction
-
-Add priority levels to tasks so users can focus on what matters most. Tasks can be marked as high, medium, or low priority, with visual indicators and filtering to help users manage their workload effectively.
-
-## Goals
-
-- Allow assigning priority (high/medium/low) to any task
-- Provide clear visual differentiation between priority levels
-- Enable filtering and sorting by priority
-- Default new tasks to medium priority
-
-## User Stories
-
-### US-001: Add priority field to database
-**Description:** As a developer, I need to store task priority so it persists across sessions.
-
-**Acceptance Criteria:**
-- [ ] Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')
-- [ ] Generate and run migration successfully
-- [ ] Typecheck passes
-
-### US-002: Display priority indicator on task cards
-**Description:** As a user, I want to see task priority at a glance so I know what needs attention first.
-
-**Acceptance Criteria:**
-- [ ] Each task card shows colored priority badge (red=high, yellow=medium, gray=low)
-- [ ] Priority visible without hovering or clicking
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-### US-003: Add priority selector to task edit
-**Description:** As a user, I want to change a task's priority when editing it.
-
-**Acceptance Criteria:**
-- [ ] Priority dropdown in task edit modal
-- [ ] Shows current priority as selected
-- [ ] Saves immediately on selection change
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-### US-004: Filter tasks by priority
-**Description:** As a user, I want to filter the task list to see only high-priority items when I'm focused.
-
-**Acceptance Criteria:**
-- [ ] Filter dropdown with options: All | High | Medium | Low
-- [ ] Filter persists in URL params
-- [ ] Empty state message when no tasks match filter
-- [ ] Typecheck passes
-- [ ] Verify in browser using dev-browser skill
-
-## Functional Requirements
-
-- FR-1: Add `priority` field to tasks table ('high' | 'medium' | 'low', default 'medium')
-- FR-2: Display colored priority badge on each task card
-- FR-3: Include priority selector in task edit modal
-- FR-4: Add priority filter dropdown to task list header
-- FR-5: Sort by priority within each status column (high to medium to low)
-
-## Non-Goals
-
-- No priority-based notifications or reminders
-- No automatic priority assignment based on due date
-- No priority inheritance for subtasks
-
-## Technical Considerations
-
-- Reuse existing badge component with color variants
-- Filter state managed via URL search params
-- Priority stored in database, not computed
-
-## Success Metrics
-
-- Users can change priority in under 2 clicks
-- High-priority tasks immediately visible at top of lists
-- No regression in task list performance
-
-## Open Questions
-
-- Should priority affect task ordering within a column?
-- Should we add keyboard shortcuts for priority changes?
+Task order:
+1. Add status field to tasks table - pending
+2. Display status badge on task cards - pending
+3. Add status dropdown to task rows - pending
+4. Add status filter dropdown - pending
 ```
 
 ---
 
-## Checklist
+## Checklist Before Creating Tasks
 
-Before saving the PRD:
+Before calling TaskCreate, verify:
 
-- [ ] Asked clarifying questions with lettered options
-- [ ] Incorporated user's answers
-- [ ] User stories are small and specific
-- [ ] Functional requirements are numbered and unambiguous
-- [ ] Non-goals section defines clear boundaries
-- [ ] Saved to `tasks/prd-[feature-name].md`
+- [ ] Searched codebase for existing functionality
+- [ ] Each task is completable in one iteration (small enough)
+- [ ] Tasks are ordered by dependency (schema → backend → UI)
+- [ ] Task descriptions are verifiable (not vague)
+- [ ] No task depends on a later task
+- [ ] `subject` uses imperative form ("Add...", "Create...", "Build...")
+- [ ] `description` provides detailed context and acceptance criteria
+- [ ] `activeForm` uses present participle ("Adding...", "Creating...", "Building...")
+
+Tasks will persist to `~/.claude/tasks/` and sync across all Ralph iterations automatically.
