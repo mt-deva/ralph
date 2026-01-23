@@ -1,5 +1,5 @@
 ---
-name: converting-prd-to-tasks
+name: prd-to-tasks
 description: "Convert PRDs to Claude Code Tasks via TaskCreate. Use when you have an existing PRD and need to create tasks for Ralph. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks."
 ---
 
