@@ -54,7 +54,7 @@ Ralph uses Claude Code Tasks for coordination:
 |---------|--------------|
 | Task storage | `~/.claude/tasks/<task-list-id>/` |
 | Cross-session sync | All sessions with same `CLAUDE_CODE_TASK_LIST_ID` see updates |
-| Task creation | Via TodoWrite tool in planning mode |
+| Task creation | Via TaskCreate tool in planning mode |
 | Task selection | Highest priority pending task |
 
 **Task list ID** is auto-generated from `<directory>-<branch>` or set manually:

@@ -28,7 +28,7 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 2. If PRD provided, analyze it:
    - Break requirements into small, completable tasks
    - Set dependencies (schema → backend → UI)
-   - Create tasks via TodoWrite with proper ordering
+   - Create tasks via TaskCreate with proper ordering
 
 3. For EACH task:
    - Use subagents to thoroughly search the codebase
@@ -61,5 +61,5 @@ After analyzing all requirements and creating tasks, reply with:
 
 - Review recent commits for context before starting
 - Analyze ALL requirements in a single iteration
-- Create tasks via TodoWrite - they persist across sessions
+- Create tasks via TaskCreate - they persist across sessions
 - DO NOT write any implementation code

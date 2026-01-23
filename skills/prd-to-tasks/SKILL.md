@@ -1,6 +1,6 @@
 ---
 name: converting-prd-to-tasks
-description: "Convert PRDs to Claude Code Tasks via TodoWrite. Use when you have an existing PRD and need to create tasks for Ralph. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks."
+description: "Convert PRDs to Claude Code Tasks via TaskCreate. Use when you have an existing PRD and need to create tasks for Ralph. Triggers on: convert this prd, turn this into tasks, create tasks from this, prd to tasks."
 ---
 
 # PRD to Tasks Converter
@@ -11,31 +11,29 @@ Converts existing PRDs to Claude Code Tasks that Ralph uses for autonomous execu
 
 ## The Job
 
-Take a PRD (markdown file or text) and convert it to tasks via TodoWrite. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
+Take a PRD (markdown file or text) and convert it to tasks via TaskCreate. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
 
 ---
 
 ## Output Format
 
-Each task requires these fields:
+Each task requires these fields for TaskCreate:
 
 ```json
 {
-  "todos": [
-    {
-      "content": "Add status column to tasks table",
-      "status": "pending",
-      "activeForm": "Adding status column to tasks table"
-    }
-  ]
+  "subject": "Add status column to tasks table",
+  "description": "Add status column to tasks table with enum values: pending, in_progress, completed. Set default to pending.",
+  "activeForm": "Adding status column to tasks table"
 }
 ```
 
 | Field | Description | Example |
 |-------|-------------|---------|
-| `content` | Imperative task description | "Add login API endpoint" |
-| `status` | `pending`, `in_progress`, or `completed` | "pending" |
-| `activeForm` | Present participle (-ing) form | "Adding login API endpoint" |
+| `subject` | Brief imperative task title | "Add login API endpoint" |
+| `description` | Detailed description of what needs to be done | "Create POST /api/login endpoint that accepts email/password and returns JWT token" |
+| `activeForm` | Present participle (-ing) form shown in spinner | "Adding login API endpoint" |
+
+All tasks are created with status `pending`. Use TaskUpdate to change status to `in_progress` or `completed`.
 
 ## Task Persistence
 
@@ -94,12 +92,19 @@ Before creating tasks, search for existing functionality:
 2. Mark already-implemented features as `completed`
 3. Note location in task description for partial implementations
 
-**If functionality exists:** Mark task as `completed` immediately with note:
+**If functionality exists:** Create the task, then immediately mark it as `completed` using TaskUpdate:
 ```json
+// First create with TaskCreate:
 {
-  "content": "Add users table migration",
-  "status": "completed",
+  "subject": "Add users table migration",
+  "description": "Add users table migration (already exists in db/migrations/001_users.sql)",
   "activeForm": "Adding users table migration"
+}
+
+// Then mark completed with TaskUpdate:
+{
+  "taskId": "<task-id>",
+  "status": "completed"
 }
 ```
 
@@ -160,33 +165,36 @@ Add ability to mark tasks with different statuses.
 **Process:**
 1. Search codebase for existing status handling → None found
 2. Break into 4 ordered tasks (schema → UI → interaction → filtering)
-3. Create tasks via TodoWrite
+3. Create tasks via TaskCreate (call TaskCreate 4 times, once per task)
 
-**Output TodoWrite call:**
+**Output TaskCreate calls:**
 ```json
+// Task 1
 {
-  "todos": [
-    {
-      "content": "Add status field to tasks table with enum: pending, in_progress, done (default pending)",
-      "status": "pending",
-      "activeForm": "Adding status field to tasks table"
-    },
-    {
-      "content": "Display status badge on task cards with colors: gray=pending, blue=in_progress, green=done",
-      "status": "pending",
-      "activeForm": "Displaying status badge on task cards"
-    },
-    {
-      "content": "Add status dropdown to each task row that saves immediately without page refresh",
-      "status": "pending",
-      "activeForm": "Adding status dropdown to task rows"
-    },
-    {
-      "content": "Add status filter dropdown (All, Pending, In Progress, Done) that persists in URL params",
-      "status": "pending",
-      "activeForm": "Adding status filter dropdown"
-    }
-  ]
+  "subject": "Add status field to tasks table",
+  "description": "Add status field to tasks table with enum: pending, in_progress, done (default pending). Include database migration.",
+  "activeForm": "Adding status field to tasks table"
+}
+
+// Task 2
+{
+  "subject": "Display status badge on task cards",
+  "description": "Display status badge on task cards with colors: gray=pending, blue=in_progress, green=done",
+  "activeForm": "Displaying status badge on task cards"
+}
+
+// Task 3
+{
+  "subject": "Add status dropdown to task rows",
+  "description": "Add status dropdown to each task row that saves immediately without page refresh",
+  "activeForm": "Adding status dropdown to task rows"
+}
+
+// Task 4
+{
+  "subject": "Add status filter dropdown",
+  "description": "Add status filter dropdown (All, Pending, In Progress, Done) that persists in URL params",
+  "activeForm": "Adding status filter dropdown"
 }
 ```
 
@@ -207,14 +215,15 @@ Task order:
 
 ## Checklist Before Creating Tasks
 
-Before calling TodoWrite, verify:
+Before calling TaskCreate, verify:
 
 - [ ] Searched codebase for existing functionality
 - [ ] Each task is completable in one iteration (small enough)
 - [ ] Tasks are ordered by dependency (schema → backend → UI)
 - [ ] Task descriptions are verifiable (not vague)
 - [ ] No task depends on a later task
-- [ ] `content` uses imperative form ("Add...", "Create...", "Build...")
+- [ ] `subject` uses imperative form ("Add...", "Create...", "Build...")
+- [ ] `description` provides detailed context and acceptance criteria
 - [ ] `activeForm` uses present participle ("Adding...", "Creating...", "Building...")
 
 Tasks will persist to `~/.claude/tasks/` and sync across all Ralph iterations automatically.
