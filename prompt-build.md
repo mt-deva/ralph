@@ -27,47 +27,31 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 
 ## Build Task
 
-1. Read the PRD at the provided path
-2. Read the progress file at the provided path (check Codebase Patterns section first)
-3. Check you're on the correct branch from PRD `branchName`. If not, check it out or create from main.
-4. Pick the **highest priority** user story where `passes: false`
+1. Review recent commits (provided in prompt) for context from previous iterations
+2. Check your current task list (visible via TodoWrite)
+3. Pick the **highest priority pending task** with no blockers
+4. Mark task as `in_progress` via TodoWrite before starting
 5. Check for suitable skills that could help with implementation (e.g., `/skill-name`)
-6. Implement that single user story
+6. Implement the task
 7. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 8. Update AGENTS.md files if you discover reusable patterns (see below)
-9. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
-10. Update the PRD to set `passes: true` for the completed story
-11. Append your progress to the progress file
+9. Mark task as `completed` via TodoWrite when done
+10. Commit with learnings in the message (see format below)
 
-## Build Progress Report
+## Commit Message Format
 
-APPEND to the progress file (never replace, always append):
-```
-## [Date/Time] - [Story ID]
-Session: $CLAUDE_SESSION_ID
-- What was implemented
-- Files changed
-- **Learnings for future iterations:**
-  - Patterns discovered (e.g., "this codebase uses X for Y")
-  - Gotchas encountered (e.g., "don't forget to update Z when changing W")
-  - Useful context (e.g., "the evaluation panel is in component X")
----
-```
-
-Include the thread URL so future iterations can reference previous work if needed.
-
-## Consolidate Patterns
-
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of the progress file (create it if it doesn't exist):
+Include learnings in commit messages so future iterations can learn from git history:
 
 ```
-## Codebase Patterns
-- Example: Use `sql<number>` template for aggregations
-- Example: Always use `IF NOT EXISTS` for migrations
-- Example: Export types from actions.ts for UI components
+feat: [Task] - [Description]
+
+Learnings:
+- [Pattern discovered, e.g., "Auth tokens stored in redis, not postgres"]
+- [Gotcha, e.g., "Must update both API and types when adding fields"]
+- [Context, e.g., "Settings panel lives in components/settings/Panel.tsx"]
 ```
 
-Only add patterns that are **general and reusable**, not story-specific details.
+Future iterations receive the last 10 commits for context.
 
 ## Update AGENTS.md Files
 
@@ -81,7 +65,7 @@ Before committing, check if any edited files have learnings worth preserving in 
    - Dependencies between files
    - Testing approaches for that area
 
-**Do NOT add:** Story-specific details, temporary notes, info already in the progress file
+**Do NOT add:** Task-specific details, temporary notes, obvious information
 
 ## Quality Requirements
 
@@ -90,49 +74,31 @@ Before committing, check if any edited files have learnings worth preserving in 
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (Required for Frontend Stories)
+## Browser Testing (Required for Frontend Tasks)
 
-For any story that changes UI, you MUST verify it works in the browser:
+For any task that changes UI, you MUST verify it works in the browser:
 
 1. Load the `dev-browser` skill
 2. Navigate to the relevant page
 3. Verify the UI changes work as expected
-4. Take a screenshot if helpful for the progress log
+4. Take a screenshot if helpful
 
-A frontend story is NOT complete until browser verification passes.
+A frontend task is NOT complete until browser verification passes.
 
 ## Stop Condition
 
-After completing a user story, check if ALL stories have `passes: true`.
+After completing a task, check if ALL tasks are completed.
 
-If ALL stories are complete and passing, reply with:
+If ALL tasks are complete, reply with:
 <promise>COMPLETE</promise>
 
-If there are still stories with `passes: false`, end your response normally (another iteration will pick up the next story).
-
----
-
-## Beads Mode
-
-If `RALPH_CURRENT_TASK` env var is set, you're in beads mode:
-
-1. Task came from `bd ready` (no blockers)
-2. Get task details: `bd show $RALPH_CURRENT_TASK`
-3. After completing implementation + tests:
-   ```bash
-   bd close $RALPH_CURRENT_TASK
-   bd sync  # IMPORTANT: flush to git immediately
-   ```
-4. If blocked by another task: `bd dep add $RALPH_CURRENT_TASK <blocking-task>`
-5. Task-specific notes: `bd comment $RALPH_CURRENT_TASK "Note here"`
-
-Cross-task learnings still go in progress.txt.
+If there are still pending tasks, end your response normally (another iteration will pick up the next task).
 
 ---
 
 ## Important
 
-- Work on ONE story/task per iteration
-- Read the Codebase Patterns section in the progress file before starting
-- Commit frequently
+- Work on ONE task per iteration
+- Review recent commits for context before starting
+- Commit frequently with learnings
 - Keep CI green

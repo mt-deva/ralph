@@ -23,85 +23,43 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 
 ## Planning Task
 
-1. Read progress file (if exists) for previous context
+1. Review recent commits (provided in prompt) for context from previous work
 
-2. Determine task source (**beads takes precedence**):
-   - If `.beads/` exists: **USE BEADS** - run `bd list --json` for tasks, ignore prd.json
-   - Otherwise, if prd.json provided: use it for story definitions
-   - Map the current task graph
+2. If PRD provided, analyze it:
+   - Break requirements into small, completable tasks
+   - Set dependencies (schema → backend → UI)
+   - Create tasks via TodoWrite with proper ordering
 
-3. For EACH task/story:
+3. For EACH task:
    - Use subagents to thoroughly search the codebase
    - Check if functionality already exists (fully or partially)
    - Identify existing patterns, utilities, or components to leverage
    - Note blockers or dependencies
 
 4. Update task state based on findings:
+   - **EXISTS**: Mark task as `completed` immediately
+   - **PARTIAL**: Add note to task, keep as `pending`
+   - **NEW**: Keep as `pending`, note dependencies
 
-   **If using beads:**
-   - **EXISTS**: Mark complete with `bd done <task-id>`
-   - **PARTIAL**: Add note, create sub-task if needed with `bd create "Complete X" --dep <partial-task-id>`
-   - **NEW**: Create task with `bd create "Title" -p <priority>`, set `--dep` on any blocking tasks
-   - Consider where new tasks fit in dependency chain
-   - Run `bd sync` after changes
-
-   **If using prd.json:**
-   - Set `passes: true` for existing functionality
-   - Add notes about existing code to leverage
-   - Reorder if dependencies require it
-
-5. Append findings to the progress file
-
-## Task Placement Guidelines
-
-When creating new beads tasks:
-1. Run `bd list --json` first to see existing task IDs and dependencies
-2. Identify if new task is blocked by existing work → use `--dep <blocker-id>`
-3. Identify if new task blocks existing work → note in description, may need to update existing task deps
-4. Set priority relative to related tasks (lower number = higher priority)
-
-Example:
-- Existing: `bd-001` (setup DB) → `bd-002` (add users table)
-- Gap found: need user validation before users table
-- Create: `bd create "Add user validation" -p 1 --dep bd-001`
-- Update: may need to add `--dep` on bd-002 to depend on new task
+5. Tasks persist automatically via CLAUDE_CODE_TASK_LIST_ID
 
 ## Gap Analysis Format
 
-For each story, determine:
-- **EXISTS** - Functionality already implemented, mark `passes: true`
+For each requirement, determine:
+- **EXISTS** - Functionality already implemented, mark completed
 - **PARTIAL** - Some pieces exist, note what's missing
 - **NEW** - Must be built from scratch, note dependencies
 
-## Planning Progress Report
-
-APPEND to the progress file:
-```
-## [Date/Time] - PLANNING MODE
-Session: $CLAUDE_SESSION_ID
-
-### Story Analysis
-- [Story ID]: [EXISTS|PARTIAL|NEW] - [brief explanation]
-
-### Codebase Discoveries
-- [Pattern or utility found that stories should leverage]
-
-### PRD Updates Made
-- [What was changed and why]
----
-```
-
 ## Stop Condition
 
-After analyzing all stories, reply with:
+After analyzing all requirements and creating tasks, reply with:
 <promise>PLAN_COMPLETE</promise>
 
 ---
 
 ## Important
 
-- Read the Codebase Patterns section in the progress file before starting
-- Analyze ALL stories in a single iteration
-- **If using beads**: update via `bd` commands only, do NOT edit prd.json
-- **If using prd.json**: update the PRD with your findings
+- Review recent commits for context before starting
+- Analyze ALL requirements in a single iteration
+- Create tasks via TodoWrite - they persist across sessions
 - DO NOT write any implementation code
