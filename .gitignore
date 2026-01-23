@@ -1,2 +1,13 @@
 # OS files
 .DS_Store
+
+# User-specific Claude settings
+.claude/settings.local.json
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*~
