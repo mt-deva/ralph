@@ -9,18 +9,24 @@ Converts existing PRDs to Claude Code Tasks that Ralph uses for autonomous execu
 
 ---
 
-## FIRST: Auto-detect and Set Task List Namespace
+## Task Namespace Detection
 
-**Before creating any tasks**, detect the namespace ralph.sh will use:
+**At the START**, detect both namespaces:
 
-1. Use Bash: `NAMESPACE="$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)" && echo "$NAMESPACE"`
-2. Check if already set correctly: `echo "${CLAUDE_CODE_TASK_LIST_ID}"`
-3. If they match, proceed normally with TaskCreate
-4. If they don't match or it's not set:
-   - Inform user: "Tasks will be created in namespace: {detected_namespace}"
-   - **Workaround**: Since Claude Code's task namespace is set at startup, just proceed with TaskCreate using the current session's namespace. Ralph will still find the tasks if the user launched Claude Code correctly.
+1. **Current namespace** (where tasks will be created): Use Bash `echo "${CLAUDE_CODE_TASK_LIST_ID:-default}"`
+2. **Ralph's expected namespace**: Use Bash `echo "$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)"`
 
-**Note**: For best results, user should launch Claude Code with: `CLAUDE_CODE_TASK_LIST_ID=<project>-<branch> claude` before running this skill. But the skill will work regardless by using whatever namespace is currently active.
+Proceed with creating tasks in the current namespace.
+
+**At the END**, output a clear summary:
+
+```
+✓ Created N tasks in namespace: {current_namespace}
+
+Ralph expects namespace: {ralph_namespace}
+{if they match: "✓ Namespaces match - ralph will find these tasks"}
+{if they don't: "⚠ Mismatch - Run ralph with: CLAUDE_CODE_TASK_LIST_ID={current_namespace} ./.ralph/ralph.sh plan 10"}
+```
 
 ---
 
