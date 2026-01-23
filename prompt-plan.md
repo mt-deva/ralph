@@ -37,18 +37,20 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
    - Note blockers or dependencies
 
 4. Update task state based on findings:
-   - **EXISTS**: Mark task as `completed` immediately
-   - **PARTIAL**: Add note to task, keep as `pending`
-   - **NEW**: Keep as `pending`, note dependencies
+   - **EXISTS**: Create task with TaskCreate, then immediately mark as `completed` via TaskUpdate
+   - **PARTIAL**: Create task with TaskCreate, add note about what exists in description, keep as `pending`
+   - **NEW**: Create task with TaskCreate, note dependencies in description, stays `pending`
 
 5. Tasks persist automatically via CLAUDE_CODE_TASK_LIST_ID
 
 ## Gap Analysis Format
 
 For each requirement, determine:
-- **EXISTS** - Functionality already implemented, mark completed
-- **PARTIAL** - Some pieces exist, note what's missing
-- **NEW** - Must be built from scratch, note dependencies
+- **EXISTS** - Functionality already implemented, create task then mark completed with TaskUpdate
+- **PARTIAL** - Some pieces exist, create task and note what's missing in description
+- **NEW** - Must be built from scratch, create task and note dependencies in description
+
+Remember: All tasks are created as `pending` via TaskCreate. Use TaskUpdate to change status to `completed`.
 
 ## Stop Condition
 
