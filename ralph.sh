@@ -85,8 +85,8 @@ $GIT_HISTORY"
 
 PRD: $PRD_FILE"
 
-  # Run opencode with prompt
-  OUTPUT=$(timeout "$ITERATION_TIMEOUT" opencode run --model=google/antigravity-claude-opus-4-5-thinking --variant=max "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
+  # Run claude with prompt
+  OUTPUT=$(timeout "$ITERATION_TIMEOUT" claude --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)
   EXIT_CODE=$?
 
   # Check for timeout
