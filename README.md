@@ -34,8 +34,8 @@ chmod +x .ralph/ralph.sh
 ## Complete Workflow
 
 ```bash
-# 1. Plan mode - create tasks from PRD
-./.ralph/ralph.sh plan 10 prd.md
+# 1. Plan mode - create tasks
+./.ralph/ralph.sh plan 10
 
 # 2. Build mode - execute tasks
 ./.ralph/ralph.sh 150
@@ -55,6 +55,8 @@ wt list   # Worktree status
 # Merge when done:
 wt merge
 ```
+
+**Specification context:** Ralph reads `docs/*.md` files for project specifications, architecture decisions, and requirements. This context helps Claude understand what to build. PRDs and requirements get converted to Tasks during planning mode.
 
 ## Task Management
 
@@ -229,5 +231,5 @@ The prompt includes a guardrail to prevent Ralph's Achilles' heel: re-implementi
 
 ## Skills
 
-- `/prd` - Generate a PRD from a feature description
-- `/prd-to-tasks` - Convert a PRD document into Claude Code Tasks
+- `/prd` - Generate a PRD from a feature description (saves to docs/)
+- `/prd-to-tasks` - Convert a PRD document into Claude Code Tasks (creates Tasks from docs/*.md)

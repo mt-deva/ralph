@@ -28,15 +28,16 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 ## Build Task
 
 1. Review recent commits (provided in prompt) for context from previous iterations
-2. Check your current task list (visible via TaskList)
-3. Pick the **highest priority pending task** with no blockers
-4. Mark task as `in_progress` via TaskUpdate before starting
-5. Check for suitable skills that could help with implementation (e.g., `/skill-name`)
-6. Implement the task
-7. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-8. Update AGENTS.md files if you discover reusable patterns (see below)
-9. Mark task as `completed` via TaskUpdate when done
-10. Commit with learnings in the message (see format below)
+2. Check `docs/*.md` for specifications, architecture decisions, and requirements
+3. Check your current task list (visible via TaskList)
+4. Pick the **highest priority pending task** with no blockers
+5. Mark task as `in_progress` via TaskUpdate before starting
+6. Check for suitable skills that could help with implementation (e.g., `/skill-name`)
+7. Implement the task
+8. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+9. Update AGENTS.md files if you discover reusable patterns (see below)
+10. Mark task as `completed` via TaskUpdate when done
+11. Commit with learnings in the message (see format below)
 
 ## Commit Message Format
 

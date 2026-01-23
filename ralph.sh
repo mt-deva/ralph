@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ralph Wiggum - Long-running AI agent loop
-# Usage: ./ralph.sh [max_iterations] [prd_path] [timeout_seconds]
-#        ./ralph.sh plan [max_iterations] [prd_path] [timeout_seconds]
+# Usage: ./ralph.sh [max_iterations] [timeout_seconds]
+#        ./ralph.sh plan [max_iterations] [timeout_seconds]
 
 set -e
 
@@ -27,14 +27,8 @@ if [[ "$1" == "plan" ]]; then
 fi
 
 MAX_ITERATIONS=${1:-10}
-ITERATION_TIMEOUT=${3:-1800}  # 30 minutes default
+ITERATION_TIMEOUT=${2:-1800}  # 30 minutes default
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PRD_FILE="${2:-}"
-
-# Resolve PRD to absolute path if provided
-if [[ -n "$PRD_FILE" ]] && [[ ! "$PRD_FILE" = /* ]]; then
-  PRD_FILE="$(pwd)/$PRD_FILE"
-fi
 
 # Generate task list ID from directory + branch
 TASK_LIST_ID="${CLAUDE_CODE_TASK_LIST_ID:-$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)}"
@@ -56,7 +50,6 @@ printf "${BOLD}============================================${NC}\n"
 printf "${BOLD}Ralph${NC} - Autonomous AI Agent Loop\n"
 printf "Mode: ${CYAN}%s${NC}\n" "$MODE_LABEL"
 printf "Tasks: ${CYAN}%s${NC}\n" "$TASK_LIST_ID"
-[[ -n "$PRD_FILE" ]] && printf "PRD: ${CYAN}%s${NC}\n" "$PRD_FILE"
 printf "Engine: ${CYAN}Claude Code${NC}\n"
 printf "Max: ${YELLOW}%s iterations${NC}, Timeout: ${YELLOW}%ss${NC}\n" "$MAX_ITERATIONS" "$ITERATION_TIMEOUT"
 printf "${BOLD}============================================${NC}\n"
@@ -80,9 +73,6 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
 Recent commits (for context):
 $GIT_HISTORY"
-  [[ -n "$PRD_FILE" ]] && [ -f "$PRD_FILE" ] && PROMPT_ARGS="$PROMPT_ARGS
-
-PRD: $PRD_FILE"
 
   # Run claude with prompt
   OUTPUT=$(timeout "$ITERATION_TIMEOUT" claude -p "CLAUDE_CODE_TASK_LIST_ID=${TASK_LIST_ID}" --model opus "$PROMPT_ARGS" 2>&1 | tee /dev/stderr)

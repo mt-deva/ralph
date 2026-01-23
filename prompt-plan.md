@@ -25,7 +25,7 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 
 1. Review recent commits (provided in prompt) for context from previous work
 
-2. If PRD provided, analyze it:
+2. Check `docs/*.md` for specifications, architecture decisions, and requirements:
    - Break requirements into small, completable tasks
    - Set dependencies (schema → backend → UI)
    - Create tasks via TaskCreate with proper ordering
