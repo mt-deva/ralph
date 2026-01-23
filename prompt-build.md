@@ -31,13 +31,36 @@ For complex analysis (dependency mapping, architectural assessment, ambiguous re
 2. Check `docs/*.md` for specifications, architecture decisions, and requirements
 3. Check your current task list (visible via TaskList)
 4. Pick the **highest priority pending task** with no blockers
-5. Mark task as `in_progress` via TaskUpdate before starting
+5. Mark task as `in_progress` via TaskUpdate before starting:
+   ```json
+   {"taskId": "1", "status": "in_progress"}
+   ```
 6. Check for suitable skills that could help with implementation (e.g., `/skill-name`)
 7. Implement the task
 8. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 9. Update AGENTS.md files if you discover reusable patterns (see below)
-10. Mark task as `completed` via TaskUpdate when done
+10. Mark task as `completed` via TaskUpdate when done:
+    ```json
+    {"taskId": "1", "status": "completed"}
+    ```
 11. Commit with learnings in the message (see format below)
+
+## Task Management Format
+
+**CRITICAL**: Task IDs are strings. Always use TaskList to get the task ID first:
+
+```json
+// Mark in progress when starting
+{"taskId": "1", "status": "in_progress"}
+
+// Mark completed when done
+{"taskId": "1", "status": "completed"}
+
+// Update description if needed
+{"taskId": "1", "description": "Updated requirements..."}
+```
+
+**Task IDs come from TaskList** - they are strings like "1", "2", "3" (not numbers or descriptive names).
 
 ## Commit Message Format
 

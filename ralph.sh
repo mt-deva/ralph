@@ -62,7 +62,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   if [[ "$MODE" == "build" ]]; then
     log_info "Claude managing tasks via $TASK_LIST_ID"
   else
-    log_info "Planning mode - creating tasks"
+    log_info "Planning mode - auditing tasks"
   fi
 
   # Get recent commit history for context

@@ -34,10 +34,13 @@ chmod +x .ralph/ralph.sh
 ## Complete Workflow
 
 ```bash
-# 1. Plan mode - create tasks
+# 0. Create tasks from specs (using skill)
+# In Claude Code: /prd-to-tasks
+
+# 1. Plan mode - audit tasks against codebase
 ./.ralph/ralph.sh plan 10
 
-# 2. Build mode - execute tasks
+# 2. Build mode - execute remaining tasks
 ./.ralph/ralph.sh 150
 
 # 3. (Optional) Parallel with worktrunk
@@ -56,7 +59,7 @@ wt list   # Worktree status
 wt merge
 ```
 
-**Specification context:** Ralph reads `docs/*.md` files for project specifications, architecture decisions, and requirements. This context helps Claude understand what to build. PRDs and requirements get converted to Tasks during planning mode.
+**Specification context:** Ralph reads `docs/*.md` files for project specifications, architecture decisions, and requirements. This context helps Claude understand what to build. Use the `/prd-to-tasks` skill to convert specs in `docs/*.md` to Tasks. Plan mode then audits those tasks against the codebase and establishes dependencies (e.g., schema → backend → UI).
 
 ## Task Management
 
@@ -71,8 +74,9 @@ Ralph uses Claude Code Tasks - a coordination primitive designed for complex pro
 |---------|--------------|
 | Task storage | `~/.claude/tasks/<task-list-id>/` |
 | Cross-session sync | All sessions with same `CLAUDE_CODE_TASK_LIST_ID` see updates |
-| Task creation | Via TaskCreate tool in planning mode |
-| Task updates | Via TaskUpdate tool in build mode |
+| Task creation | Via `/prd-to-tasks` skill (before plan mode) |
+| Task auditing | Via TaskUpdate in plan mode (mark completed, set dependencies) |
+| Task execution | Via TaskUpdate in build mode (mark in_progress, completed) |
 | Task viewing | Via TaskList and TaskGet tools |
 | Dependencies | Tasks can block each other via `blocks`/`blockedBy` metadata |
 
@@ -85,7 +89,7 @@ CLAUDE_CODE_TASK_LIST_ID=my-feature ./ralph.sh 50
 
 Ralph uses these Claude Code tools to manage tasks:
 
-**TaskCreate** - Create new tasks (plan mode):
+**TaskCreate** - Create new tasks (used by `/prd-to-tasks` skill):
 ```json
 {
   "subject": "Add status column to tasks table",
@@ -93,12 +97,20 @@ Ralph uses these Claude Code tools to manage tasks:
   "activeForm": "Adding status column to tasks table"
 }
 ```
+Note: Tasks are created BEFORE plan mode via the `/prd-to-tasks` skill, not during plan mode.
 
-**TaskUpdate** - Update task status (build mode):
+**TaskUpdate** - Update task status and dependencies:
 ```json
+// Mark task in progress (build mode)
 {
-  "taskId": "task-123",
-  "status": "in_progress"  // or "completed"
+  "taskId": "1",
+  "status": "in_progress"
+}
+
+// Set dependencies (plan mode) - task IDs from TaskList
+{
+  "taskId": "2",
+  "addBlockedBy": ["1"]
 }
 ```
 
@@ -110,12 +122,17 @@ Returns full task info including description
 
 ### Task Lifecycle
 
-1. **Plan mode**: TaskCreate creates tasks with status `pending`
-2. **Build mode**:
-   - TaskList shows available tasks
+1. **Before plan mode**: Use `/prd-to-tasks` skill to create tasks from `docs/*.md` specs
+2. **Plan mode**:
+   - Audits existing tasks against codebase
+   - Marks completed tasks via TaskUpdate
+   - Establishes dependencies via TaskUpdate (addBlockedBy/addBlocks)
+3. **Build mode**:
+   - TaskList shows available tasks (pending, not blocked)
    - TaskUpdate sets status to `in_progress` when starting
    - TaskUpdate sets status to `completed` when done
-3. **All modes**: Tasks persist to filesystem, sync across all sessions with same task list ID
+   - Completing a task unblocks dependent tasks
+4. **All modes**: Tasks persist to filesystem, sync across all sessions with same task list ID
 
 ## Parallel Execution with Worktrunk
 
