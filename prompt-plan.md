@@ -1,4 +1,6 @@
-Call TaskList NOW as your first action. Then read the rest of these instructions.
+YOUR ONLY TASK RIGHT NOW: Call the TaskList tool immediately. Do not read further. Do not ask questions. Just call TaskList.
+
+After calling TaskList, read these instructions:
 
 # Ralph Agent Instructions - PLAN MODE
 
