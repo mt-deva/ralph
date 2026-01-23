@@ -9,6 +9,22 @@ Converts existing PRDs to Claude Code Tasks that Ralph uses for autonomous execu
 
 ---
 
+## FIRST: Verify Task List Namespace
+
+**Before creating any tasks**, verify the task list namespace matches what ralph.sh expects:
+
+1. Use Bash to get expected namespace: `echo "$(basename "$(pwd)")-$(git branch --show-current 2>/dev/null || echo main)"`
+2. Use Bash to check current namespace: `echo "${CLAUDE_CODE_TASK_LIST_ID:-not-set}"`
+3. If they don't match:
+   - Tell user the expected namespace
+   - Tell user to exit and restart claude with: `CLAUDE_CODE_TASK_LIST_ID=<namespace> claude`
+   - Stop executing the skill
+4. If they match: Proceed with task creation
+
+This ensures tasks are created in the same namespace that ralph.sh will use.
+
+---
+
 ## The Job
 
 Take a PRD (markdown file or text) and convert it to tasks via TaskCreate. Tasks persist via `CLAUDE_CODE_TASK_LIST_ID` environment variable.
